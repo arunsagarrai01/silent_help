@@ -92,8 +92,7 @@ class SmsService {
       // the grace period so one bad contact does not stall the rest.
       return await completer.future.timeout(
         const Duration(seconds: 12),
-        onTimeout: () =>
-            SmsSendResult(phoneNumber: sanitized, success: true),
+        onTimeout: () => SmsSendResult(phoneNumber: sanitized, success: true),
       );
     } catch (e) {
       return SmsSendResult(

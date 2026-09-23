@@ -1,0 +1,135 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Page-1" id="_LMbXZk8c1UAs3MEIyfK">
+    <mxGraphModel dx="934" dy="644" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="f1PJ7wxwARlhjfRzrLjv-1" parent="1" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;" value="User&lt;div&gt;&lt;br&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="60" width="30" x="80" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="f1PJ7wxwARlhjfRzrLjv-2" parent="1" style="whiteSpace=wrap;html=1;aspect=fixed;" value="" vertex="1">
+          <mxGeometry height="350" width="350" x="170" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="f1PJ7wxwARlhjfRzrLjv-3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="Calculator Interface" vertex="1">
+          <mxGeometry height="30" width="120" x="260" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="f1PJ7wxwARlhjfRzrLjv-4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="Hidden SOS Menu / Config" vertex="1">
+          <mxGeometry height="30" width="120" x="260" y="180" as="geometry" />
+        </mxCell>
+        <mxCell id="f1PJ7wxwARlhjfRzrLjv-5" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="Trusted Emergency Contacts" vertex="1">
+          <mxGeometry height="40" width="120" x="260" y="220" as="geometry" />
+        </mxCell>
+        <mxCell id="f1PJ7wxwARlhjfRzrLjv-6" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="Location Services" vertex="1">
+          <mxGeometry height="40" width="120" x="260" y="270" as="geometry" />
+        </mxCell>
+        <mxCell id="f1PJ7wxwARlhjfRzrLjv-7" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="SOS Alert Module" vertex="1">
+          <mxGeometry height="40" width="120" x="260" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="f1PJ7wxwARlhjfRzrLjv-8" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="Security &amp;amp; Privacy" vertex="1">
+          <mxGeometry height="40" width="120" x="260" y="370" as="geometry" />
+        </mxCell>
+        <mxCell id="f1PJ7wxwARlhjfRzrLjv-9" edge="1" parent="1" style="endArrow=classic;html=1;rounded=0;entryX=0;entryY=0.301;entryDx=0;entryDy=0;entryPerimeter=0;" target="f1PJ7wxwARlhjfRzrLjv-2" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="110" y="235" as="sourcePoint" />
+            <mxPoint x="160" y="185" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="f1PJ7wxwARlhjfRzrLjv-10" connectable="0" parent="f1PJ7wxwARlhjfRzrLjv-9" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="Uses the app" vertex="1">
+          <mxGeometry relative="1" x="-0.14" y="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="f1PJ7wxwARlhjfRzrLjv-11" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="GPS" vertex="1">
+          <mxGeometry height="40" width="90" x="160" y="470" as="geometry" />
+        </mxCell>
+        <mxCell id="f1PJ7wxwARlhjfRzrLjv-12" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="Shake Detection" vertex="1">
+          <mxGeometry height="40" width="90" x="260" y="470" as="geometry" />
+        </mxCell>
+        <mxCell id="f1PJ7wxwARlhjfRzrLjv-13" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="Voice Reconization" vertex="1">
+          <mxGeometry height="40" width="90" x="365" y="470" as="geometry" />
+        </mxCell>
+        <mxCell id="f1PJ7wxwARlhjfRzrLjv-14" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="Background Service" vertex="1">
+          <mxGeometry height="40" width="80" x="460" y="470" as="geometry" />
+        </mxCell>
+        <mxCell id="f1PJ7wxwARlhjfRzrLjv-15" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="Android OS" vertex="1">
+          <mxGeometry height="40" width="90" x="550" y="470" as="geometry" />
+        </mxCell>
+        <mxCell id="f1PJ7wxwARlhjfRzrLjv-17" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="Device Modle Features" vertex="1">
+          <mxGeometry height="30" width="155" x="150" y="430" as="geometry" />
+        </mxCell>
+        <mxCell id="f1PJ7wxwARlhjfRzrLjv-18" edge="1" parent="1" source="f1PJ7wxwARlhjfRzrLjv-12" style="endArrow=classic;startArrow=classic;html=1;rounded=0;exitX=1;exitY=0;exitDx=0;exitDy=0;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="350" y="460" as="sourcePoint" />
+            <mxPoint x="410" y="410" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="f1PJ7wxwARlhjfRzrLjv-19" connectable="0" parent="f1PJ7wxwARlhjfRzrLjv-18" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="Uses device sensors&amp;amp; background services" vertex="1">
+          <mxGeometry relative="1" x="-0.01" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="f1PJ7wxwARlhjfRzrLjv-21" parent="1" style="whiteSpace=wrap;html=1;aspect=fixed;" value="" vertex="1">
+          <mxGeometry height="200" width="200" x="600" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="f1PJ7wxwARlhjfRzrLjv-22" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="Authatication" vertex="1">
+          <mxGeometry height="30" width="100" x="630" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="f1PJ7wxwARlhjfRzrLjv-23" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;b&gt;&lt;font style=&quot;font-size: 19px;&quot;&gt;Firebase&lt;/font&gt;&lt;/b&gt;&lt;br&gt;(Backend Services)" vertex="1">
+          <mxGeometry height="30" width="155" x="610" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="f1PJ7wxwARlhjfRzrLjv-24" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;b&gt;&lt;font style=&quot;font-size: 15px;&quot;&gt;Mobile Application&lt;/font&gt;&lt;/b&gt;&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 15px;&quot;&gt;(Flutter+Dart)&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="30" width="155" x="250" y="90" as="geometry" />
+        </mxCell>
+        <mxCell id="f1PJ7wxwARlhjfRzrLjv-25" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="Cloud Firestore" vertex="1">
+          <mxGeometry height="30" width="100" x="630" y="160" as="geometry" />
+        </mxCell>
+        <mxCell id="f1PJ7wxwARlhjfRzrLjv-26" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="Cloud Messaging(FCM)" vertex="1">
+          <mxGeometry height="30" width="100" x="630" y="200" as="geometry" />
+        </mxCell>
+        <mxCell id="f1PJ7wxwARlhjfRzrLjv-27" edge="1" parent="1" source="f1PJ7wxwARlhjfRzrLjv-2" style="endArrow=classic;startArrow=classic;html=1;rounded=0;exitX=0.996;exitY=0.393;exitDx=0;exitDy=0;exitPerimeter=0;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="540" y="200" as="sourcePoint" />
+            <mxPoint x="600" y="145" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="f1PJ7wxwARlhjfRzrLjv-28" connectable="0" parent="f1PJ7wxwARlhjfRzrLjv-27" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="Secure API&lt;div&gt;(HTTPS)&lt;/div&gt;" vertex="1">
+          <mxGeometry relative="1" x="0.0782" y="-1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="f1PJ7wxwARlhjfRzrLjv-29" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="SMS Gateway" vertex="1">
+          <mxGeometry height="60" width="120" x="600" y="340" as="geometry" />
+        </mxCell>
+        <mxCell id="f1PJ7wxwARlhjfRzrLjv-33" edge="1" parent="1" style="endArrow=classic;html=1;rounded=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" target="f1PJ7wxwARlhjfRzrLjv-29" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="520" y="400" as="sourcePoint" />
+            <mxPoint x="570" y="350" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="f1PJ7wxwARlhjfRzrLjv-34" connectable="0" parent="f1PJ7wxwARlhjfRzrLjv-33" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="Send SMS" vertex="1">
+          <mxGeometry relative="1" x="-0.0837" y="-1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="f1PJ7wxwARlhjfRzrLjv-35" parent="1" style="swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;" value="Technology Stack" vertex="1">
+          <mxGeometry height="120" width="155" x="730" y="420" as="geometry" />
+        </mxCell>
+        <mxCell id="f1PJ7wxwARlhjfRzrLjv-36" parent="f1PJ7wxwARlhjfRzrLjv-35" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;whiteSpace=wrap;html=1;" value="Flutter(Frontend)" vertex="1">
+          <mxGeometry height="30" width="155" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="f1PJ7wxwARlhjfRzrLjv-37" parent="f1PJ7wxwARlhjfRzrLjv-35" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;whiteSpace=wrap;html=1;" value="Dart(Language)" vertex="1">
+          <mxGeometry height="30" width="155" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="f1PJ7wxwARlhjfRzrLjv-38" parent="f1PJ7wxwARlhjfRzrLjv-35" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;whiteSpace=wrap;html=1;" value="Firebase(Auth, Firestore, FCM)&lt;div&gt;&lt;br&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="30" width="155" y="90" as="geometry" />
+        </mxCell>
+        <mxCell id="f1PJ7wxwARlhjfRzrLjv-39" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="Android(Tragate Platform)" vertex="1">
+          <mxGeometry height="30" width="155" x="720" y="550" as="geometry" />
+        </mxCell>
+        <mxCell id="f1PJ7wxwARlhjfRzrLjv-40" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="SMS Gateway" vertex="1">
+          <mxGeometry height="30" width="80" x="730" y="535" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
