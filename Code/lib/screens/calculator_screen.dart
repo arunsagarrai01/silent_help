@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../services/sensor_service.dart';
 import '../services/emergency_service.dart';
 import '../services/storage_service.dart';
+import '../services/foreground_sos_service.dart';
 import '../widgets/calculator_button.dart';
 import 'contacts_screen.dart';
 import 'settings_screen.dart';
@@ -15,13 +16,14 @@ class CalculatorScreen extends StatefulWidget {
   State<CalculatorScreen> createState() => _CalculatorScreenState();
 }
 
-class _CalculatorScreenState extends State<CalculatorScreen> with WidgetsBindingObserver {
+class _CalculatorScreenState extends State<CalculatorScreen>
+    with WidgetsBindingObserver {
   String _display = '0';
   String _previousValue = '';
   String _operation = '';
   bool _waitingForOperand = false;
   String _inputSequence = '';
-  
+
   final SensorService _sensorService = SensorService();
   final StorageService _storageService = StorageService();
   String _secretPattern = '123==';
@@ -43,19 +45,30 @@ class _CalculatorScreenState extends State<CalculatorScreen> with WidgetsBinding
   Future<void> _initializeApp() async {
     // Load secret pattern
     _secretPattern = await _storageService.getSecretPattern();
-    
-    // Start shake detection
+
+    // Start in-foreground shake detection (works while the screen is open).
     final shakeCount = await _storageService.getShakeCount();
     _sensorService.startShakeDetection(
       onShakeDetected: _onShakeDetected,
       requiredShakeCount: shakeCount,
     );
+
+    // Keep the background service's shake count in sync.
+    await ForegroundSosService.setShakeCount(shakeCount);
+
+    // Resume background monitoring if the user had it enabled previously.
+    final monitoringEnabled = await _storageService.isMonitoringEnabled();
+    if (monitoringEnabled && !await ForegroundSosService.isRunning()) {
+      await ForegroundSosService.start();
+    }
   }
 
   void _onShakeDetected(int shakeCount) {
-    // Trigger emergency silently
-    EmergencyService.triggerEmergencyAlert('Shake Detection ($shakeCount shakes)');
-    
+    // Trigger emergency silently (auto-sends SMS; cooldown handled internally).
+    EmergencyService.triggerEmergencyAlert(
+      'Shake Detection ($shakeCount shakes)',
+    );
+
     // Provide subtle haptic feedback
     HapticFeedback.lightImpact();
   }
@@ -68,7 +81,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with WidgetsBinding
       } else {
         _display = _display == '0' ? digit : _display + digit;
       }
-      
+
       // Track input sequence for secret pattern
       _inputSequence += digit;
       _checkSecretPattern();
@@ -83,7 +96,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with WidgetsBinding
     } else if (!_waitingForOperand) {
       double previousValue = double.parse(_previousValue);
       double result = _calculate(previousValue, inputValue, _operation);
-      
+
       setState(() {
         _display = result.toString();
         _previousValue = _display;
@@ -94,13 +107,17 @@ class _CalculatorScreenState extends State<CalculatorScreen> with WidgetsBinding
       _waitingForOperand = true;
       _operation = nextOperation;
     });
-    
+
     // Track operation in sequence
     _inputSequence += nextOperation;
     _checkSecretPattern();
   }
 
-  double _calculate(double firstOperand, double secondOperand, String operation) {
+  double _calculate(
+    double firstOperand,
+    double secondOperand,
+    String operation,
+  ) {
     switch (operation) {
       case '+':
         return firstOperand + secondOperand;
@@ -121,7 +138,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with WidgetsBinding
     if (_previousValue.isNotEmpty && !_waitingForOperand) {
       double previousValue = double.parse(_previousValue);
       double result = _calculate(previousValue, inputValue, _operation);
-      
+
       setState(() {
         _display = result.toString();
         _previousValue = '';
@@ -129,7 +146,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with WidgetsBinding
         _waitingForOperand = true;
       });
     }
-    
+
     // Track equals in sequence
     _inputSequence += '=';
     _checkSecretPattern();
@@ -139,14 +156,14 @@ class _CalculatorScreenState extends State<CalculatorScreen> with WidgetsBinding
     if (_inputSequence.contains(_secretPattern)) {
       // Secret pattern detected - trigger emergency silently
       EmergencyService.triggerEmergencyAlert('Secret Calculator Pattern');
-      
+
       // Provide subtle haptic feedback
       HapticFeedback.lightImpact();
-      
+
       // Reset sequence
       _inputSequence = '';
     }
-    
+
     // Keep sequence length manageable
     if (_inputSequence.length > 20) {
       _inputSequence = _inputSequence.substring(_inputSequence.length - 10);
@@ -190,7 +207,9 @@ class _CalculatorScreenState extends State<CalculatorScreen> with WidgetsBinding
                 Navigator.pop(context);
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const ContactsScreen()),
+                  MaterialPageRoute(
+                    builder: (context) => const ContactsScreen(),
+                  ),
                 );
               },
             ),
@@ -201,7 +220,9 @@ class _CalculatorScreenState extends State<CalculatorScreen> with WidgetsBinding
                 Navigator.pop(context);
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                  MaterialPageRoute(
+                    builder: (context) => const SettingsScreen(),
+                  ),
                 );
               },
             ),
@@ -220,7 +241,9 @@ class _CalculatorScreenState extends State<CalculatorScreen> with WidgetsBinding
                 Navigator.pop(context);
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                  MaterialPageRoute(
+                    builder: (context) => const SettingsScreen(),
+                  ),
                 );
               },
             ),
@@ -247,15 +270,13 @@ class _CalculatorScreenState extends State<CalculatorScreen> with WidgetsBinding
       leading: Icon(icon, color: Colors.grey[700]),
       title: Text(title),
       onTap: onTap,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
     );
   }
 
   void _showAlertMessageDialog() {
     TextEditingController controller = TextEditingController();
-    
+
     // Load current message
     _storageService.getAlertMessage().then((message) {
       controller.text = message;
@@ -304,10 +325,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with WidgetsBinding
           icon: const Icon(Icons.more_vert, color: Colors.white),
           onPressed: _showHiddenMenu,
         ),
-        title: const Text(
-          'Calculator',
-          style: TextStyle(color: Colors.white),
-        ),
+        title: const Text('Calculator', style: TextStyle(color: Colors.white)),
       ),
       body: Column(
         children: [
@@ -334,7 +352,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with WidgetsBinding
               ),
             ),
           ),
-          
+
           // Buttons
           Expanded(
             flex: 3,
@@ -373,7 +391,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with WidgetsBinding
                       ],
                     ),
                   ),
-                  
+
                   // Row 2: 7, 8, 9, ×
                   Expanded(
                     child: Row(
@@ -399,7 +417,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with WidgetsBinding
                       ],
                     ),
                   ),
-                  
+
                   // Row 3: 4, 5, 6, -
                   Expanded(
                     child: Row(
@@ -425,7 +443,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with WidgetsBinding
                       ],
                     ),
                   ),
-                  
+
                   // Row 4: 1, 2, 3, +
                   Expanded(
                     child: Row(
@@ -451,7 +469,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with WidgetsBinding
                       ],
                     ),
                   ),
-                  
+
                   // Row 5: 0, ., =
                   Expanded(
                     child: Row(

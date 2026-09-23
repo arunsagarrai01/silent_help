@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../services/storage_service.dart';
 import '../services/emergency_service.dart';
+import '../services/foreground_sos_service.dart';
+import '../services/permission_service.dart';
+import 'history_screen.dart';
 
 /// Settings screen for emergency triggers and app configuration
 class SettingsScreen extends StatefulWidget {
@@ -12,10 +15,11 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final StorageService _storageService = StorageService();
-  
+
   String _secretPattern = '123==';
   int _shakeCount = 3;
   String _alertMessage = '';
+  bool _monitoringEnabled = false;
   bool _isLoading = true;
 
   @override
@@ -29,11 +33,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final pattern = await _storageService.getSecretPattern();
       final shakeCount = await _storageService.getShakeCount();
       final message = await _storageService.getAlertMessage();
-      
+      final monitoring = await ForegroundSosService.isRunning();
+
       setState(() {
         _secretPattern = pattern;
         _shakeCount = shakeCount;
         _alertMessage = message;
+        _monitoringEnabled = monitoring;
         _isLoading = false;
       });
     } catch (e) {
@@ -46,7 +52,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _showSecretPatternDialog() {
     final controller = TextEditingController(text: _secretPattern);
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -95,7 +101,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _showShakeCountDialog() {
     int tempShakeCount = _shakeCount;
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -122,7 +128,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   Text(
                     '$tempShakeCount shakes',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ],
               ),
@@ -137,6 +146,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           TextButton(
             onPressed: () async {
               await _storageService.setShakeCount(tempShakeCount);
+              await ForegroundSosService.setShakeCount(tempShakeCount);
               setState(() {
                 _shakeCount = tempShakeCount;
               });
@@ -152,7 +162,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _showAlertMessageDialog() {
     final controller = TextEditingController(text: _alertMessage);
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -190,6 +200,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Future<void> _toggleMonitoring(bool enable) async {
+    if (enable) {
+      // Ensure the critical permissions are granted before arming.
+      final perms = await PermissionService.requestCorePermissions();
+      if (perms['sms'] != true) {
+        _showErrorSnackBar(
+          'SMS permission is required to send emergency alerts.',
+        );
+        return;
+      }
+      if (perms['location'] != true) {
+        _showErrorSnackBar(
+          'Location permission recommended so alerts can include your position.',
+        );
+      }
+      // Background location gives the best result while the screen is locked.
+      await PermissionService.requestBackgroundLocation();
+
+      final started = await ForegroundSosService.start();
+      await _storageService.setMonitoringEnabled(started);
+      setState(() => _monitoringEnabled = started);
+      if (started) {
+        _showSuccessSnackBar('Background monitoring enabled');
+      } else {
+        _showErrorSnackBar('Could not start background monitoring');
+      }
+    } else {
+      await ForegroundSosService.stop();
+      await _storageService.setMonitoringEnabled(false);
+      setState(() => _monitoringEnabled = false);
+      _showSuccessSnackBar('Background monitoring disabled');
+    }
+  }
+
   void _testEmergencySystem() {
     showDialog(
       context: context,
@@ -197,7 +241,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         title: const Text('Test Emergency System'),
         content: const Text(
           'This will trigger a test emergency alert to all your trusted contacts. '
-          'Are you sure you want to continue?'
+          'Are you sure you want to continue?',
         ),
         actions: [
           TextButton(
@@ -207,8 +251,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              await EmergencyService.testEmergencySystem();
-              _showSuccessSnackBar('Test alert sent');
+              await PermissionService.requestCorePermissions();
+              final result = await EmergencyService.testEmergencySystem();
+              switch (result) {
+                case EmergencyResult.sent:
+                  _showSuccessSnackBar('Test alert sent to contacts');
+                  break;
+                case EmergencyResult.cooldown:
+                  _showErrorSnackBar(
+                    'Still in cooldown from a recent alert. Try again shortly.',
+                  );
+                  break;
+                case EmergencyResult.noContacts:
+                  _showErrorSnackBar('Add a trusted contact first');
+                  break;
+                case EmergencyResult.smsUnavailable:
+                  _showErrorSnackBar(
+                    'SMS unavailable (check SIM / permission)',
+                  );
+                  break;
+              }
             },
             style: TextButton.styleFrom(foregroundColor: Colors.orange),
             child: const Text('Send Test'),
@@ -219,20 +281,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showErrorSnackBar(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
     );
   }
 
   void _showSuccessSnackBar(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green,
-      ),
+      SnackBar(content: Text(message), backgroundColor: Colors.green),
     );
   }
 
@@ -263,18 +321,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   subtitle: 'Trigger after $_shakeCount shakes',
                   onTap: _showShakeCountDialog,
                 ),
-                
+                Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: SwitchListTile(
+                    secondary: Icon(
+                      _monitoringEnabled ? Icons.shield : Icons.shield_outlined,
+                      color: _monitoringEnabled ? Colors.green : Colors.blue,
+                      size: 28,
+                    ),
+                    title: const Text(
+                      'Monitor when minimized / locked',
+                      style: TextStyle(fontWeight: FontWeight.w500),
+                    ),
+                    subtitle: Text(
+                      _monitoringEnabled
+                          ? 'Active. Shake detection runs in the background.'
+                          : 'Off. Detection only works while app is open.',
+                      style: TextStyle(color: Colors.grey[600]),
+                    ),
+                    value: _monitoringEnabled,
+                    onChanged: (v) => _toggleMonitoring(v),
+                  ),
+                ),
+
                 const SizedBox(height: 24),
                 _buildSectionHeader('Alert Configuration'),
                 _buildSettingCard(
                   icon: Icons.message,
                   title: 'Emergency Message',
-                  subtitle: _alertMessage.length > 50 
+                  subtitle: _alertMessage.length > 50
                       ? '${_alertMessage.substring(0, 50)}...'
                       : _alertMessage,
                   onTap: _showAlertMessageDialog,
                 ),
-                
+
                 const SizedBox(height: 24),
                 _buildSectionHeader('Testing'),
                 _buildSettingCard(
@@ -284,7 +364,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onTap: _testEmergencySystem,
                   iconColor: Colors.orange,
                 ),
-                
+                _buildSettingCard(
+                  icon: Icons.history,
+                  title: 'Emergency History',
+                  subtitle: 'View past alerts sent from this device',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const HistoryScreen(),
+                      ),
+                    );
+                  },
+                ),
+
                 const SizedBox(height: 24),
                 _buildInfoCard(),
               ],
@@ -316,19 +409,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
-        leading: Icon(
-          icon,
-          color: iconColor ?? Colors.blue,
-          size: 28,
-        ),
-        title: Text(
-          title,
-          style: const TextStyle(fontWeight: FontWeight.w500),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: TextStyle(color: Colors.grey[600]),
-        ),
+        leading: Icon(icon, color: iconColor ?? Colors.blue, size: 28),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
+        subtitle: Text(subtitle, style: TextStyle(color: Colors.grey[600])),
         trailing: const Icon(Icons.arrow_forward_ios, size: 16),
         onTap: onTap,
       ),

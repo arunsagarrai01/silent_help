@@ -1,10 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'screens/calculator_screen.dart';
+import 'services/foreground_sos_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
+  // Required so the UI isolate can receive messages from the background
+  // foreground-service isolate.
+  FlutterForegroundTask.initCommunicationPort();
+
+  // Prepare the notification channel / task options up-front (cheap, no start).
+  ForegroundSosService.init();
+
   // Set system UI overlay style
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -12,7 +21,7 @@ void main() {
       statusBarIconBrightness: Brightness.dark,
     ),
   );
-  
+
   runApp(const SilentHelpApp());
 }
 
@@ -23,7 +32,7 @@ class SilentHelpApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Calculator',
-      debugShowCheckedModeBanner: false,// Removes the banner
+      debugShowCheckedModeBanner: false, // Removes the banner
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: Colors.blue,
@@ -36,7 +45,9 @@ class SilentHelpApp extends StatelessWidget {
           elevation: 0,
         ),
       ),
-      home: const CalculatorScreen(),
+      // WithForegroundTask keeps the task alive and lets the plugin manage the
+      // service lifecycle correctly while the disguised UI is shown.
+      home: const WithForegroundTask(child: CalculatorScreen()),
     );
   }
 }
