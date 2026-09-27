@@ -30,21 +30,21 @@ class EmergencyRecord {
     required this.status,
     this.latitude,
     this.longitude,
-  });
+  }); //Emergency Record
 
   bool get hasLocation => latitude != null && longitude != null;
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'timestamp': timestamp.toIso8601String(),
-        'triggerType': triggerType,
-        'latitude': latitude,
-        'longitude': longitude,
-        'message': message,
-        'contactCount': contactCount,
-        'deliveredCount': deliveredCount,
-        'status': status,
-      };
+    'id': id,
+    'timestamp': timestamp.toIso8601String(),
+    'triggerType': triggerType,
+    'latitude': latitude,
+    'longitude': longitude,
+    'message': message,
+    'contactCount': contactCount,
+    'deliveredCount': deliveredCount,
+    'status': status,
+  };
 
   factory EmergencyRecord.fromJson(Map<String, dynamic> json) {
     return EmergencyRecord(

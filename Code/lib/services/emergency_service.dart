@@ -81,7 +81,7 @@ class EmergencyService {
         baseMessage: baseMessage,
         triggerType: triggerType,
         position: position,
-        timestamp: DateTime.now(),
+        timestamp: DateTime.now(), //Date and time
       );
 
       // 5. Guard against a device that cannot send SMS at all.

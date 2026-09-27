@@ -39,7 +39,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Emergency History'),
+        title: const Text('Emergency History'), //Title Emergency History
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
         elevation: 0,
@@ -55,13 +55,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _records.isEmpty
-              ? _buildEmpty()
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _records.length,
-                  itemBuilder: (context, index) =>
-                      _buildRecordCard(_records[index]),
-                ),
+          ? _buildEmpty()
+          : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: _records.length,
+              itemBuilder: (context, index) =>
+                  _buildRecordCard(_records[index]),
+            ),
     );
   }
 

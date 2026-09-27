@@ -13,7 +13,7 @@ class ContactsScreen extends StatefulWidget {
 class _ContactsScreenState extends State<ContactsScreen> {
   final StorageService _storageService = StorageService();
   List<Contact> _contacts = [];
-  bool _isLoading = true;
+  bool _isLoading = true; // is loading true
 
   @override
   void initState() {
@@ -37,8 +37,12 @@ class _ContactsScreenState extends State<ContactsScreen> {
   }
 
   void _showAddContactDialog([Contact? existingContact]) {
-    final nameController = TextEditingController(text: existingContact?.name ?? '');
-    final phoneController = TextEditingController(text: existingContact?.phoneNumber ?? '');
+    final nameController = TextEditingController(
+      text: existingContact?.name ?? '',
+    );
+    final phoneController = TextEditingController(
+      text: existingContact?.phoneNumber ?? '',
+    );
     final isEditing = existingContact != null;
 
     showDialog(
@@ -102,7 +106,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
                 Navigator.pop(context);
                 _loadContacts();
                 _showSuccessSnackBar(
-                  isEditing ? 'Contact updated' : 'Contact added'
+                  isEditing ? 'Contact updated' : 'Contact added',
                 );
               } catch (e) {
                 _showErrorSnackBar('Error saving contact: $e');
@@ -147,19 +151,13 @@ class _ContactsScreenState extends State<ContactsScreen> {
 
   void _showErrorSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
     );
   }
 
   void _showSuccessSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green,
-      ),
+      SnackBar(content: Text(message), backgroundColor: Colors.green),
     );
   }
 
@@ -175,8 +173,8 @@ class _ContactsScreenState extends State<ContactsScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _contacts.isEmpty
-              ? _buildEmptyState()
-              : _buildContactsList(),
+          ? _buildEmptyState()
+          : _buildContactsList(),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddContactDialog(),
         backgroundColor: Colors.blue,
@@ -190,27 +188,17 @@ class _ContactsScreenState extends State<ContactsScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.contacts_outlined,
-            size: 80,
-            color: Colors.grey[400],
-          ),
+          Icon(Icons.contacts_outlined, size: 80, color: Colors.grey[400]),
           const SizedBox(height: 16),
           Text(
             'No trusted contacts yet',
-            style: TextStyle(
-              fontSize: 18,
-              color: Colors.grey[600],
-            ),
+            style: TextStyle(fontSize: 18, color: Colors.grey[600]),
           ),
           const SizedBox(height: 8),
           Text(
             'Add emergency contacts who will receive\nalerts when you need help',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[500],
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.grey[500]),
           ),
         ],
       ),

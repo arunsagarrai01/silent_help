@@ -6,7 +6,7 @@ import '../services/storage_service.dart';
 import '../services/foreground_sos_service.dart';
 import '../widgets/calculator_button.dart';
 import 'contacts_screen.dart';
-import 'settings_screen.dart';
+import 'settings_screen.dart';//imports
 
 /// Main calculator screen that disguises the emergency app
 class CalculatorScreen extends StatefulWidget {
