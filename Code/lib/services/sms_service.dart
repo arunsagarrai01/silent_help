@@ -11,7 +11,7 @@ class SmsSendResult {
   const SmsSendResult({
     required this.phoneNumber,
     required this.success,
-    this.error,
+    this.error,//error finder
   });
 }
 

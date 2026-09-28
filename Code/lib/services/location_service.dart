@@ -1,5 +1,4 @@
 import 'package:geolocator/geolocator.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 /// Location service for getting current GPS coordinates
 class LocationService {
@@ -11,37 +10,39 @@ class LocationService {
   static Future<Position?> getBestLocation() async {
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      final permission = await Geolocator.checkPermission();
-      final permitted =
-          permission == LocationPermission.always ||
-          permission == LocationPermission.whileInUse;
 
-      if (!serviceEnabled || !permitted) {
-        // Even without a live service we may have a cached fix.
+      if (!serviceEnabled) {
         return await _lastKnown();
       }
 
-      // Kick off a fresh fix but cap the wait so the SOS never stalls.
+      final hasAlways =
+          await Geolocator.checkPermission() == LocationPermission.always;
+
+      final accuracy = hasAlways
+          ? LocationAccuracy.high
+          : LocationAccuracy.medium;
+      final timeLimit = hasAlways
+          ? const Duration(seconds: 8)
+          : const Duration(seconds: 5);
+
       try {
         return await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-          timeLimit: const Duration(seconds: 8),
+          desiredAccuracy: accuracy,
+          timeLimit: timeLimit,
         );
       } catch (_) {
-        // Timeout or transient error: fall back to the last known position.
         final cached = await _lastKnown();
         if (cached != null) return cached;
-        // Last resort: a quick, lower-accuracy attempt.
         try {
           return await Geolocator.getCurrentPosition(
-            desiredAccuracy: LocationAccuracy.medium,
-            timeLimit: const Duration(seconds: 5),
+            desiredAccuracy: LocationAccuracy.low,
+            timeLimit: const Duration(seconds: 3),
           );
         } catch (_) {
           return null;
         }
       }
-    } catch (e) {
+    } catch (_) {
       return await _lastKnown();
     }
   }
@@ -56,38 +57,31 @@ class LocationService {
 
   static Future<Position?> getCurrentLocation() async {
     try {
-      // Check if location services are enabled
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         return null;
       }
 
-      // Check location permissions
-      LocationPermission permission = await Geolocator.checkPermission();
+      final permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          return null;
-        }
+        return null;
       }
 
       if (permission == LocationPermission.deniedForever) {
         return null;
       }
 
-      // Get current position
       return await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
         timeLimit: const Duration(seconds: 10),
       );
-    } catch (e) {
+    } catch (_) {
       return null;
     }
   }
 
   static Future<bool> requestLocationPermission() async {
-    final status = await Permission.location.request();
-    return status == PermissionStatus.granted;
+    return true;
   }
 
   static String formatLocation(Position position) {

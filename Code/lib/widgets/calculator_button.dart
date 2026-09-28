@@ -5,7 +5,7 @@ class CalculatorButton extends StatelessWidget {
   final String text;
   final VoidCallback onPressed;
   final Color backgroundColor;
-  final Color textColor;
+  final Color textColor;// color
 
   const CalculatorButton({
     super.key,
@@ -23,7 +23,7 @@ class CalculatorButton extends StatelessWidget {
         child: ElevatedButton(
           onPressed: onPressed,
           style: ElevatedButton.styleFrom(
-            backgroundColor: backgroundColor,
+            backgroundColor: backgroundColor,//background color
             foregroundColor: textColor,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
@@ -33,7 +33,7 @@ class CalculatorButton extends StatelessWidget {
           ),
           child: Text(
             text,
-            style: const TextStyle(
+            style: const TextStyle(//textstyle
               fontSize: 24,
               fontWeight: FontWeight.w400,
             ),

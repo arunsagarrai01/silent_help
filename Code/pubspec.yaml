@@ -51,6 +51,7 @@ dependencies:
   permission_handler: ^11.2.0
   flutter_foreground_task: ^10.0.0
   another_telephony: ^0.4.1
+  porcupine_flutter: ^4.0.0
 
 dev_dependencies:
   flutter_test:

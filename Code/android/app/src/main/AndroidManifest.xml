@@ -22,6 +22,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+
+    <!-- Microphone for voice SOS -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <application
         android:label="Calculator"
@@ -53,10 +57,10 @@
         <!-- flutter_foreground_task background service.
              Warning: do NOT change the service name.
              foregroundServiceType must match the types requested at runtime
-             (location + dataSync). -->
+             (location + dataSync + microphone). -->
         <service
             android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
-            android:foregroundServiceType="location|dataSync"
+            android:foregroundServiceType="location|dataSync|microphone"
             android:exported="false" />
 
         <!-- Don't delete the meta-data below.

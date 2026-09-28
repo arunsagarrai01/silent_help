@@ -20,6 +20,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   int _shakeCount = 3;
   String _alertMessage = '';
   bool _monitoringEnabled = false;
+  bool _voiceSosEnabled = false;
   bool _isLoading = true;
 
   @override
@@ -34,12 +35,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final shakeCount = await _storageService.getShakeCount();
       final message = await _storageService.getAlertMessage();
       final monitoring = await ForegroundSosService.isRunning();
+      final voiceSos = await ForegroundSosService.isVoiceSosEnabled();
 
       setState(() {
         _secretPattern = pattern;
         _shakeCount = shakeCount;
         _alertMessage = message;
         _monitoringEnabled = monitoring;
+        _voiceSosEnabled = voiceSos;
         _isLoading = false;
       });
     } catch (e) {
@@ -55,7 +58,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Secret Calculator Pattern'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -70,14 +73,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 12),
             const Text(
-              'Enter a sequence that will trigger emergency alert when typed in calculator. Use numbers, +, -, ×, ÷, and = symbols.',
+              'Enter a sequence that will trigger emergency alert when typed in calculator.',
               style: TextStyle(fontSize: 12, color: Colors.grey),
             ),
           ],
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           TextButton(
@@ -88,7 +91,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 setState(() {
                   _secretPattern = pattern;
                 });
-                Navigator.pop(context);
+                Navigator.pop(dialogContext);
                 _showSuccessSnackBar('Secret pattern updated');
               }
             },
@@ -104,58 +107,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Shake Detection'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Number of shakes required to trigger emergency:'),
-            const SizedBox(height: 16),
-            StatefulBuilder(
-              builder: (context, setDialogState) => Column(
-                children: [
-                  Slider(
-                    value: tempShakeCount.toDouble(),
-                    min: 2,
-                    max: 10,
-                    divisions: 8,
-                    label: tempShakeCount.toString(),
-                    onChanged: (value) {
-                      setDialogState(() {
-                        tempShakeCount = value.round();
-                      });
-                    },
-                  ),
-                  Text(
-                    '$tempShakeCount shakes',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              await _storageService.setShakeCount(tempShakeCount);
-              await ForegroundSosService.setShakeCount(tempShakeCount);
-              setState(() {
-                _shakeCount = tempShakeCount;
-              });
-              Navigator.pop(context);
-              _showSuccessSnackBar('Shake count updated');
-            },
-            child: const Text('Save'),
-          ),
-        ],
+      builder: (dialogContext) => ShakeCountDialog(
+        initialCount: tempShakeCount,
+        onSave: (value) {
+          _storageService.setShakeCount(value);
+          ForegroundSosService.setShakeCount(value);
+          setState(() {
+            _shakeCount = value;
+          });
+          _showSuccessSnackBar('Shake count updated');
+        },
+        onCancel: () => Navigator.pop(dialogContext),
       ),
     );
   }
@@ -165,7 +127,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Emergency Alert Message'),
         content: TextField(
           controller: controller,
@@ -178,7 +140,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           TextButton(
@@ -189,7 +151,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 setState(() {
                   _alertMessage = message;
                 });
-                Navigator.pop(context);
+                Navigator.pop(dialogContext);
                 _showSuccessSnackBar('Alert message updated');
               }
             },
@@ -202,7 +164,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _toggleMonitoring(bool enable) async {
     if (enable) {
-      // Ensure the critical permissions are granted before arming.
       final perms = await PermissionService.requestCorePermissions();
       if (perms['sms'] != true) {
         _showErrorSnackBar(
@@ -212,10 +173,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
       if (perms['location'] != true) {
         _showErrorSnackBar(
-          'Location permission recommended so alerts can include your position.',
+          'Location permission recommended for location in alerts.',
         );
       }
-      // Background location gives the best result while the screen is locked.
       await PermissionService.requestBackgroundLocation();
 
       final started = await ForegroundSosService.start();
@@ -234,10 +194,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _toggleVoiceSos(bool enable) async {
+    setState(() => _voiceSosEnabled = enable);
+
+    if (enable) {
+      _showSuccessSnackBar(
+        'Voice SOS enabled. Say "SilentHelp Emergency" while app is open',
+      );
+    } else {
+      _showSuccessSnackBar('Voice SOS disabled');
+    }
+  }
+
   void _testEmergencySystem() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Test Emergency System'),
         content: const Text(
           'This will trigger a test emergency alert to all your trusted contacts. '
@@ -245,12 +217,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () async {
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
               await PermissionService.requestCorePermissions();
               final result = await EmergencyService.testEmergencySystem();
               switch (result) {
@@ -258,9 +230,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _showSuccessSnackBar('Test alert sent to contacts');
                   break;
                 case EmergencyResult.cooldown:
-                  _showErrorSnackBar(
-                    'Still in cooldown from a recent alert. Try again shortly.',
-                  );
+                  _showErrorSnackBar('Still in cooldown. Try again shortly.');
                   break;
                 case EmergencyResult.noContacts:
                   _showErrorSnackBar('Add a trusted contact first');
@@ -343,6 +313,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onChanged: (v) => _toggleMonitoring(v),
                   ),
                 ),
+                if (_monitoringEnabled) ...[
+                  const SizedBox(height: 12),
+                  Card(
+                    margin: const EdgeInsets.symmetric(horizontal: 16),
+                    child: SwitchListTile(
+                      secondary: Icon(
+                        _voiceSosEnabled ? Icons.mic : Icons.mic_off,
+                        color: _voiceSosEnabled ? Colors.green : Colors.grey,
+                        size: 28,
+                      ),
+                      title: const Text(
+                        'Voice SOS',
+                        style: TextStyle(fontWeight: FontWeight.w500),
+                      ),
+                      subtitle: Text(
+                        _voiceSosEnabled
+                            ? 'Say "SilentHelp Emergency" while app is open'
+                            : 'Tap to enable (works when app is open)',
+                        style: TextStyle(color: Colors.grey[600]),
+                      ),
+                      value: _voiceSosEnabled,
+                      onChanged: (v) => _toggleVoiceSos(v),
+                    ),
+                  ),
+                ],
 
                 const SizedBox(height: 24),
                 _buildSectionHeader('Alert Configuration'),
@@ -372,7 +367,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const HistoryScreen(),
+                        builder: (dialogContext) => const HistoryScreen(),
                       ),
                     );
                   },
@@ -442,15 +437,84 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 12),
             const Text(
-              '• Calculator Pattern: Enter the secret sequence in the calculator to trigger emergency\n'
+              '• Calculator Pattern: Enter the secret sequence to trigger emergency\n'
               '• Shake Detection: Shake your phone the specified number of times\n'
-              '• All triggers work silently without changing the calculator display\n'
+              '• Background Monitoring: Keep listening when app is minimized\n'
+              '• Voice SOS: Say "SilentHelp Emergency" while app is open\n'
+              '• All triggers work silently without changing calculator display\n'
               '• Emergency alerts include your location and timestamp',
               style: TextStyle(fontSize: 14, height: 1.4),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Dialog widget for shake count selection
+class ShakeCountDialog extends StatefulWidget {
+  final int initialCount;
+  final VoidCallback onCancel;
+  final ValueChanged<int> onSave;
+
+  const ShakeCountDialog({
+    super.key,
+    required this.initialCount,
+    required this.onCancel,
+    required this.onSave,
+  });
+
+  @override
+  State<ShakeCountDialog> createState() => _ShakeCountDialogState();
+}
+
+class _ShakeCountDialogState extends State<ShakeCountDialog> {
+  late int tempShakeCount;
+
+  @override
+  void initState() {
+    super.initState();
+    tempShakeCount = widget.initialCount;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Shake Detection'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('Number of shakes required to trigger emergency:'),
+          const SizedBox(height: 16),
+          Slider(
+            value: tempShakeCount.toDouble(),
+            min: 2,
+            max: 10,
+            divisions: 8,
+            label: tempShakeCount.toString(),
+            onChanged: (value) {
+              setState(() {
+                tempShakeCount = value.round();
+              });
+            },
+          ),
+          Text(
+            '$tempShakeCount shakes',
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: widget.onCancel, child: const Text('Cancel')),
+        TextButton(
+          onPressed: () {
+            widget.onSave(tempShakeCount);
+            Navigator.pop(context);
+          },
+          child: const Text('Save'),
+        ),
+      ],
     );
   }
 }
