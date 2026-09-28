@@ -31,7 +31,7 @@ class SilentHelpApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Calculator',
+      title: 'Calculator', //app title
       debugShowCheckedModeBanner: false, // Removes the banner
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(

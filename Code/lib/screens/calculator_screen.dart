@@ -6,7 +6,7 @@ import '../services/storage_service.dart';
 import '../services/foreground_sos_service.dart';
 import '../widgets/calculator_button.dart';
 import 'contacts_screen.dart';
-import 'settings_screen.dart';//imports
+import 'settings_screen.dart'; //imports
 
 /// Main calculator screen that disguises the emergency app
 class CalculatorScreen extends StatefulWidget {
@@ -61,6 +61,9 @@ class _CalculatorScreenState extends State<CalculatorScreen>
     if (monitoringEnabled && !await ForegroundSosService.isRunning()) {
       await ForegroundSosService.start();
     }
+    // Sync voice SOS state to foreground service
+    final voiceSosEnabled = await ForegroundSosService.isVoiceSosEnabled();
+    await ForegroundSosService.setVoiceSosEnabled(voiceSosEnabled);
   }
 
   void _onShakeDetected(int shakeCount) {

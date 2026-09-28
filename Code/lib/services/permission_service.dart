@@ -36,9 +36,25 @@ class PermissionService {
     return _request(Permission.locationAlways);
   }
 
+  /// Helper for foreground-service isolate to check and request background
+  /// location if needed (since the isolate runs after permissions are granted).
+  static Future<bool> ensureBackgroundLocation() async {
+    final always = await Permission.locationAlways.status;
+    if (always.isGranted) return true;
+    // If we have whenInUse, try to upgrade.
+    final whenInUse = await Permission.locationWhenInUse.status;
+    if (whenInUse.isGranted) {
+      return await _request(Permission.locationAlways);
+    }
+    return false;
+  }
+
   static Future<bool> hasSms() => Permission.sms.isGranted;
 
   static Future<bool> hasLocation() => Permission.locationWhenInUse.isGranted;
+
+  static Future<bool> hasLocationAlways() =>
+      Permission.locationAlways.isGranted;
 
   static Future<bool> hasNotification() => Permission.notification.isGranted;
 
