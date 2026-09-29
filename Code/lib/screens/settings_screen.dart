@@ -21,6 +21,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _secretPattern = '123==';
   int _shakeCount = 3;
   String _alertMessage = '';
+  String _voicePhrase = 'silent help emergency';
   bool _monitoringEnabled = false;
   bool _voiceSosEnabled = false;
   bool _isLoading = true;
@@ -38,11 +39,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final message = await _storageService.getAlertMessage();
       final monitoring = await ForegroundSosService.isRunning();
       final voiceSos = await ForegroundSosService.isVoiceSosEnabled();
+      final voicePhrase = await _storageService.getVoicePhrase();
 
       setState(() {
         _secretPattern = pattern;
         _shakeCount = shakeCount;
         _alertMessage = message;
+        _voicePhrase = voicePhrase;
         _monitoringEnabled = monitoring;
         _voiceSosEnabled = voiceSos;
         _isLoading = false;
@@ -119,6 +122,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           final message = controller.text.trim();
           if (message.isNotEmpty) {
             await _storageService.setAlertMessage(message);
+            await VoiceSosController.instance.refreshConfig();
             setState(() => _alertMessage = message);
             if (mounted) Navigator.pop(dialogContext);
             _showSuccessSnackBar('Alert message updated');
@@ -175,7 +179,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
       final started = await VoiceSosController.instance.start();
       if (started) {
-        _showSuccessSnackBar('Voice SOS active. Say "SilentHelp Emergency"');
+        _showSuccessSnackBar('Voice SOS active. Say "$_voicePhrase"');
       } else {
         _showErrorSnackBar('Voice recognition unavailable on this device');
       }
@@ -183,6 +187,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await VoiceSosController.instance.stop();
       _showSuccessSnackBar('Voice SOS disabled');
     }
+  }
+
+  void _showVoicePhraseDialog() {
+    final controller = TextEditingController(text: _voicePhrase);
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => _themedDialog(
+        title: 'Voice Trigger Phrase',
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _themedTextField(controller, 'e.g. help me now'),
+            const SizedBox(height: 12),
+            const Text(
+              'Speak this phrase to trigger an SOS. Choose 2–4 clear words. '
+              'Every word must be heard (order does not matter).',
+              style: TextStyle(fontSize: 12, color: AppTheme.grey),
+            ),
+          ],
+        ),
+        onSave: () async {
+          final phrase = controller.text.trim();
+          if (phrase.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length <
+              2) {
+            _showErrorSnackBar('Use at least 2 words for reliable detection');
+            return;
+          }
+          await VoiceSosController.instance.updatePhrase(phrase);
+          setState(() => _voicePhrase = phrase.toLowerCase());
+          if (mounted) Navigator.pop(dialogContext);
+          _showSuccessSnackBar('Voice phrase updated');
+        },
+        onCancel: () => Navigator.pop(dialogContext),
+      ),
+    );
   }
 
   void _testEmergencySystem() {
@@ -342,10 +382,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   icon: _voiceSosEnabled ? Icons.mic : Icons.mic_off,
                   title: 'Voice SOS',
                   subtitle: _voiceSosEnabled
-                      ? 'Say "SilentHelp Emergency" while app is open'
-                      : 'Tap to enable hands-free voice trigger',
+                      ? 'Listening in background. Say "$_voicePhrase"'
+                      : 'Tap to enable hands-free voice trigger (background)',
                   value: _voiceSosEnabled,
                   onChanged: _toggleVoiceSos,
+                ),
+                _buildTile(
+                  icon: Icons.record_voice_over,
+                  title: 'Voice Trigger Phrase',
+                  subtitle: '"$_voicePhrase"',
+                  onTap: _showVoicePhraseDialog,
                 ),
                 const SizedBox(height: 24),
                 _buildSectionHeader('Alert Configuration'),
@@ -581,7 +627,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             '• Calculator Pattern: Enter the secret sequence to trigger emergency\n'
             '• Shake Detection: Shake your phone the set number of times\n'
             '• Background Monitoring: Keep listening when app is minimized\n'
-            '• Voice SOS: Say "SilentHelp Emergency" while the app is open\n'
+            '• Voice SOS: Say your custom phrase to trigger hands-free\n'
             '• All triggers work silently and send your location + timestamp',
             style: TextStyle(
               fontSize: 13,

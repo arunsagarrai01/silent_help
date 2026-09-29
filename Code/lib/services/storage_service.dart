@@ -17,6 +17,10 @@ class StorageService {
   static const String _historyKey = 'emergency_history';
   static const String _lastTriggerKey = 'last_sos_trigger_ms';
   static const String _monitoringEnabledKey = 'monitoring_enabled';
+  static const String _voicePhraseKey = 'voice_trigger_phrase';
+
+  /// Default voice trigger phrase.
+  static const String defaultVoicePhrase = 'silent help emergency';
 
   /// Max history entries to retain locally.
   static const int _maxHistory = 50;
@@ -36,6 +40,13 @@ class StorageService {
     final prefs = await SharedPreferences.getInstance();
     final contactsJson = json.encode(contacts.map((c) => c.toJson()).toList());
     await prefs.setString(_contactsKey, contactsJson);
+  }
+
+  /// Raw JSON array of contacts (used to hand config to the native voice
+  /// service). Returns '[]' when none.
+  Future<String> getContactsJson() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_contactsKey) ?? '[]';
   }
 
   Future<void> addContact(Contact contact) async {
@@ -100,6 +111,19 @@ class StorageService {
   Future<void> setMonitoringEnabled(bool enabled) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_monitoringEnabledKey, enabled);
+  }
+
+  // Custom voice trigger phrase
+  Future<String> getVoicePhrase() async {
+    final prefs = await SharedPreferences.getInstance();
+    final phrase = prefs.getString(_voicePhraseKey);
+    if (phrase == null || phrase.trim().isEmpty) return defaultVoicePhrase;
+    return phrase.toLowerCase();
+  }
+
+  Future<void> setVoicePhrase(String phrase) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_voicePhraseKey, phrase.trim().toLowerCase());
   }
 
   // SOS cooldown / debounce

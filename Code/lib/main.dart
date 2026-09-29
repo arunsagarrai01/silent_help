@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'constants/app_theme.dart';
 import 'screens/calculator_screen.dart';
+import 'services/app_bootstrap.dart';
 import 'services/foreground_sos_service.dart';
 
 void main() {
@@ -23,7 +24,11 @@ void main() {
     ),
   );
 
+  // Show UI immediately, then bring up the optional Firebase cloud layer in the
+  // background. The app is fully usable (local SOS) whether or not this
+  // succeeds — Firebase is never on the critical path.
   runApp(const SilentHelpApp());
+  AppBootstrap.initCloud();
 }
 
 class SilentHelpApp extends StatelessWidget {

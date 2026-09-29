@@ -52,6 +52,14 @@ dependencies:
   flutter_foreground_task: ^10.0.0
   another_telephony: ^0.4.1
   porcupine_flutter: ^4.0.0
+  firebase_core: ^4.15.0
+  firebase_auth: ^6.7.0
+  cloud_firestore: ^6.10.0
+  firebase_messaging: ^16.7.0
+  firebase_app_check: ^0.4.8
+  firebase_crashlytics: ^5.4.0
+  cloud_functions: ^6.5.0
+  connectivity_plus: ^7.3.1
 
 dev_dependencies:
   flutter_test:

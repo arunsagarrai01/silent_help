@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../constants/app_theme.dart';
 import '../models/contact.dart';
 import '../services/storage_service.dart';
+import '../services/voice_sos_controller.dart';
 
 /// Screen for managing trusted emergency contacts
 class ContactsScreen extends StatefulWidget {
@@ -25,6 +26,8 @@ class _ContactsScreenState extends State<ContactsScreen> {
   Future<void> _loadContacts() async {
     try {
       final contacts = await _storageService.getContacts();
+      // Keep the background voice service's contact list up to date.
+      VoiceSosController.instance.refreshConfig();
       if (!mounted) return;
       setState(() {
         _contacts = contacts;
