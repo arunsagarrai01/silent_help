@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../constants/app_theme.dart';
 import '../models/emergency_record.dart';
 import '../services/storage_service.dart';
 
@@ -38,22 +39,23 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.surface,
       appBar: AppBar(
-        title: const Text('Emergency History'), //Title Emergency History
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
+        title: const Text('Emergency History'),
+        backgroundColor: AppTheme.surface,
+        foregroundColor: AppTheme.charcoal,
         elevation: 0,
         actions: [
           if (_records.isNotEmpty)
             IconButton(
-              icon: const Icon(Icons.delete_outline),
+              icon: const Icon(Icons.delete_outline, color: AppTheme.danger),
               tooltip: 'Clear history',
               onPressed: _confirmClear,
             ),
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: AppTheme.lime))
           : _records.isEmpty
           ? _buildEmpty()
           : ListView.builder(
@@ -68,20 +70,34 @@ class _HistoryScreenState extends State<HistoryScreen> {
   void _confirmClear() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Clear History'),
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppTheme.card,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppTheme.radius),
+        ),
+        title: const Text(
+          'Clear History',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
         content: const Text('Delete all stored emergency records?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel', style: TextStyle(color: AppTheme.grey)),
           ),
-          TextButton(
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.danger,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+              ),
+            ),
             onPressed: () {
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
               _clear();
             },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Clear'),
           ),
         ],
@@ -94,11 +110,31 @@ class _HistoryScreenState extends State<HistoryScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.history, size: 80, color: Colors.grey[400]),
-          const SizedBox(height: 16),
-          Text(
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: AppTheme.limeSoft,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.history,
+              size: 64,
+              color: AppTheme.limeDark,
+            ),
+          ),
+          const SizedBox(height: 20),
+          const Text(
             'No emergency alerts yet',
-            style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.charcoal,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Alerts you send will appear here',
+            style: TextStyle(fontSize: 14, color: AppTheme.grey),
           ),
         ],
       ),
@@ -107,30 +143,55 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   Widget _buildRecordCard(EmergencyRecord r) {
     final delivered = r.deliveredCount == r.contactCount && r.contactCount > 0;
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+    final statusColor = delivered ? AppTheme.success : AppTheme.warning;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: AppTheme.card,
+        borderRadius: BorderRadius.circular(AppTheme.radius),
+        boxShadow: AppTheme.softShadow,
+      ),
       child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: delivered ? Colors.green : Colors.orange,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: Container(
+          width: 46,
+          height: 46,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: statusColor.withValues(alpha: 0.15),
+            shape: BoxShape.circle,
+          ),
           child: Icon(
-            delivered ? Icons.check : Icons.warning_amber,
-            color: Colors.white,
+            delivered ? Icons.check_circle : Icons.warning_amber_rounded,
+            color: statusColor,
           ),
         ),
         title: Text(
           r.triggerType,
-          style: const TextStyle(fontWeight: FontWeight.w500),
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            color: AppTheme.charcoal,
+          ),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(_formatDate(r.timestamp)),
-            Text(r.status),
+            const SizedBox(height: 4),
+            Text(
+              _formatDate(r.timestamp),
+              style: const TextStyle(color: AppTheme.grey, fontSize: 12),
+            ),
+            Text(
+              r.status,
+              style: const TextStyle(
+                color: AppTheme.charcoalSoft,
+                fontSize: 13,
+              ),
+            ),
             if (r.hasLocation)
               Text(
-                'Loc: ${r.latitude!.toStringAsFixed(4)}, '
-                '${r.longitude!.toStringAsFixed(4)}',
-                style: const TextStyle(fontSize: 12),
+                'Loc: ${r.latitude!.toStringAsFixed(4)}, ${r.longitude!.toStringAsFixed(4)}',
+                style: const TextStyle(fontSize: 12, color: AppTheme.grey),
               ),
           ],
         ),

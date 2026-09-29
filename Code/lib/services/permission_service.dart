@@ -49,12 +49,17 @@ class PermissionService {
     return false;
   }
 
+  /// Request microphone permission (needed for Voice SOS).
+  static Future<bool> requestMicrophone() => _request(Permission.microphone);
+
   static Future<bool> hasSms() => Permission.sms.isGranted;
 
   static Future<bool> hasLocation() => Permission.locationWhenInUse.isGranted;
 
   static Future<bool> hasLocationAlways() =>
       Permission.locationAlways.isGranted;
+
+  static Future<bool> hasMicrophone() => Permission.microphone.isGranted;
 
   static Future<bool> hasNotification() => Permission.notification.isGranted;
 

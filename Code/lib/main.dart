@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'constants/app_theme.dart';
 import 'screens/calculator_screen.dart';
 import 'services/foreground_sos_service.dart';
 
@@ -26,6 +27,7 @@ void main() {
 }
 
 class SilentHelpApp extends StatelessWidget {
+  // Srateless Widget
   const SilentHelpApp({super.key});
 
   @override
@@ -33,18 +35,9 @@ class SilentHelpApp extends StatelessWidget {
     return MaterialApp(
       title: 'Calculator', //app title
       debugShowCheckedModeBanner: false, // Removes the banner
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue,
-          brightness: Brightness.light,
-        ),
-        useMaterial3: true,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.black87,
-          elevation: 0,
-        ),
-      ),
+      // Emergency screens use the lime/charcoal AppTheme. The calculator
+      // disguise keeps its own dark styling inside its widget.
+      theme: AppTheme.themeData(),
       // WithForegroundTask keeps the task alive and lets the plugin manage the
       // service lifecycle correctly while the disguised UI is shown.
       home: const WithForegroundTask(child: CalculatorScreen()),

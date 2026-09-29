@@ -7,7 +7,6 @@ import 'package:sensors_plus/sensors_plus.dart';
 
 import 'emergency_service.dart';
 import 'permission_service.dart';
-import 'speech_service.dart';
 
 /// Entry point for the foreground-service isolate.
 @pragma('vm:entry-point')
@@ -16,6 +15,11 @@ void startSosCallback() {
 }
 
 /// Runs inside the Android foreground service isolate.
+///
+/// Handles SHAKE detection in the background (screen off / app minimized).
+/// Voice SOS is handled separately in the UI isolate because Android's
+/// SpeechRecognizer requires an Activity + platform channel, which are not
+/// available in a background isolate.
 class SosTaskHandler extends TaskHandler {
   static const double _shakeThreshold = 17.0;
   static const double _minShakeMagnitude = 14.0;
@@ -25,37 +29,13 @@ class SosTaskHandler extends TaskHandler {
   final List<DateTime> _shakeTimestamps = [];
   DateTime? _lastTriggerTime;
 
-  SpeechService? _speechService;
-  bool _voiceSosEnabled = false;
-
   int _requiredShakeCount = 3;
   bool _handling = false;
 
   @override
   Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
     _requiredShakeCount = await _loadShakeCount();
-    _voiceSosEnabled = await _loadVoiceSosEnabled();
     _startListening();
-
-    if (_voiceSosEnabled) {
-      _speechService = SpeechService(onWakeWordDetected: _onVoiceSosDetected);
-      await _speechService?.startListening();
-    }
-  }
-
-  Future<void> _onVoiceSosDetected() async {
-    if (_handling) return;
-
-    final result = await EmergencyService.triggerEmergencyAlert(
-      'Voice SOS (SilentHelp Emergency)',
-    );
-
-    if (result == EmergencyResult.sent) {
-      FlutterForegroundTask.updateService(
-        notificationTitle: 'Calculator',
-        notificationText: 'SOS sent. Monitoring resumed.',
-      );
-    }
   }
 
   void _startListening() {
@@ -135,18 +115,6 @@ class SosTaskHandler extends TaskHandler {
     if (data is int && data >= 2) {
       _requiredShakeCount = data;
     }
-    if (data is bool) {
-      if (data && _speechService == null) {
-        _voiceSosEnabled = true;
-        _speechService = SpeechService(onWakeWordDetected: _onVoiceSosDetected);
-        _speechService?.startListening();
-      } else if (!data && _speechService != null) {
-        _speechService?.stopListening();
-        _speechService?.dispose();
-        _speechService = null;
-        _voiceSosEnabled = false;
-      }
-    }
   }
 
   @override
@@ -154,20 +122,6 @@ class SosTaskHandler extends TaskHandler {
     await _accelSub?.cancel();
     _accelSub = null;
     _shakeTimestamps.clear();
-    await _speechService?.stopListening();
-    await _speechService?.dispose();
-    _speechService = null;
-  }
-
-  Future<bool> _loadVoiceSosEnabled() async {
-    try {
-      final value = await FlutterForegroundTask.getData<bool>(
-        key: _kVoiceSosEnabledKey,
-      );
-      return value ?? false;
-    } catch (_) {
-      return false;
-    }
   }
 }
 
@@ -220,9 +174,6 @@ class ForegroundSosService {
       key: _kVoiceSosEnabledKey,
       value: enabled,
     );
-    if (await isRunning()) {
-      FlutterForegroundTask.sendDataToTask(enabled);
-    }
   }
 
   static Future<bool> isVoiceSosEnabled() async {
@@ -242,18 +193,12 @@ class ForegroundSosService {
 
     await PermissionService.requestBackgroundLocation();
 
-    final serviceTypes = <ForegroundServiceTypes>[
-      ForegroundServiceTypes.location,
-      ForegroundServiceTypes.dataSync,
-    ];
-    final voiceEnabled = await isVoiceSosEnabled();
-    if (voiceEnabled) {
-      serviceTypes.add(ForegroundServiceTypes.microphone);
-    }
-
     final result = await FlutterForegroundTask.startService(
       serviceId: 8421,
-      serviceTypes: serviceTypes,
+      serviceTypes: const [
+        ForegroundServiceTypes.location,
+        ForegroundServiceTypes.dataSync,
+      ],
       notificationTitle: 'Calculator',
       notificationText: 'Running',
       callback: startSosCallback,
