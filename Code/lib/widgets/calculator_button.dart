@@ -5,13 +5,13 @@ class CalculatorButton extends StatelessWidget {
   final String text;
   final VoidCallback onPressed;
   final Color backgroundColor;
-  final Color textColor;// color
+  final Color textColor; // color
 
   const CalculatorButton({
     super.key,
     required this.text,
     required this.onPressed,
-    this.backgroundColor = const Color(0xFF333333),
+    this.backgroundColor = const Color(0xFF333333), // background color
     this.textColor = Colors.white,
   });
 
@@ -20,10 +20,10 @@ class CalculatorButton extends StatelessWidget {
     return Expanded(
       child: Container(
         margin: const EdgeInsets.all(4),
-        child: ElevatedButton(
+        child: ElevatedButton( // elevated button
           onPressed: onPressed,
           style: ElevatedButton.styleFrom(
-            backgroundColor: backgroundColor,//background color
+            backgroundColor: backgroundColor, //background color
             foregroundColor: textColor,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
@@ -33,7 +33,8 @@ class CalculatorButton extends StatelessWidget {
           ),
           child: Text(
             text,
-            style: const TextStyle(//textstyle
+            style: const TextStyle(
+              //textstyle
               fontSize: 24,
               fontWeight: FontWeight.w400,
             ),

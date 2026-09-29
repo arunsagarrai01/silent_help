@@ -13,7 +13,7 @@ class Contact {
   });
 
   // Convert to JSON for storage
-  Map<String, dynamic> toJson() {
+  Map<String, dynamic> toJson() {// Map
     return {
       'id': id,
       'name': name,

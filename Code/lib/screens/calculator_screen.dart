@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../constants/app_theme.dart';
 import '../services/sensor_service.dart';
 import '../services/emergency_service.dart';
 import '../services/storage_service.dart';
 import '../services/foreground_sos_service.dart';
+import '../services/voice_sos_controller.dart';
 import '../widgets/calculator_button.dart';
 import 'contacts_screen.dart';
 import 'settings_screen.dart'; //imports
@@ -39,7 +41,20 @@ class _CalculatorScreenState extends State<CalculatorScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _sensorService.stopShakeDetection();
+    VoiceSosController.instance.stop();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Voice SOS uses the mic which only works while the app is foregrounded.
+    // Pause it when backgrounded to be a good citizen and avoid false hits.
+    if (state == AppLifecycleState.resumed) {
+      VoiceSosController.instance.startIfEnabled();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      VoiceSosController.instance.stop();
+    }
   }
 
   Future<void> _initializeApp() async {
@@ -61,9 +76,8 @@ class _CalculatorScreenState extends State<CalculatorScreen>
     if (monitoringEnabled && !await ForegroundSosService.isRunning()) {
       await ForegroundSosService.start();
     }
-    // Sync voice SOS state to foreground service
-    final voiceSosEnabled = await ForegroundSosService.isVoiceSosEnabled();
-    await ForegroundSosService.setVoiceSosEnabled(voiceSosEnabled);
+    // Start Voice SOS (UI isolate) if the user enabled it.
+    await VoiceSosController.instance.startIfEnabled();
   }
 
   void _onShakeDetected(int shakeCount) {
@@ -186,23 +200,46 @@ class _CalculatorScreenState extends State<CalculatorScreen>
   void _showHiddenMenu() {
     showModalBottomSheet(
       context: context,
+      backgroundColor: AppTheme.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 40,
-              height: 4,
+              width: 44,
+              height: 5,
               decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
+                color: AppTheme.greyLight,
+                borderRadius: BorderRadius.circular(3),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    gradient: AppTheme.limeGradient,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(Icons.shield, color: AppTheme.charcoal),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'SilentHelp',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.charcoal,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
             _buildMenuOption(
               icon: Icons.contacts,
               title: 'Trusted Contacts',
@@ -217,7 +254,7 @@ class _CalculatorScreenState extends State<CalculatorScreen>
               },
             ),
             _buildMenuOption(
-              icon: Icons.settings,
+              icon: Icons.notifications_active,
               title: 'Emergency Triggers',
               onTap: () {
                 Navigator.pop(context);
@@ -253,6 +290,7 @@ class _CalculatorScreenState extends State<CalculatorScreen>
             _buildMenuOption(
               icon: Icons.exit_to_app,
               title: 'Exit',
+              iconColor: AppTheme.danger,
               onTap: () {
                 Navigator.pop(context);
                 SystemNavigator.pop();
@@ -268,12 +306,36 @@ class _CalculatorScreenState extends State<CalculatorScreen>
     required IconData icon,
     required String title,
     required VoidCallback onTap,
+    Color? iconColor,
   }) {
-    return ListTile(
-      leading: Icon(icon, color: Colors.grey[700]),
-      title: Text(title),
-      onTap: onTap,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: AppTheme.card,
+        borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+      ),
+      child: ListTile(
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: (iconColor ?? AppTheme.charcoal).withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: iconColor ?? AppTheme.charcoal, size: 22),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            color: AppTheme.charcoal,
+          ),
+        ),
+        trailing: const Icon(Icons.chevron_right, color: AppTheme.grey),
+        onTap: onTap,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+        ),
+      ),
     );
   }
 
@@ -287,25 +349,45 @@ class _CalculatorScreenState extends State<CalculatorScreen>
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Emergency Alert Message'),
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppTheme.card,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppTheme.radius),
+        ),
+        title: const Text(
+          'Emergency Alert Message',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
         content: TextField(
           controller: controller,
           maxLines: 3,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             hintText: 'Enter your emergency message...',
-            border: OutlineInputBorder(),
+            filled: true,
+            fillColor: AppTheme.surface,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+              borderSide: BorderSide.none,
+            ),
           ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel', style: TextStyle(color: AppTheme.grey)),
           ),
-          TextButton(
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.lime,
+              foregroundColor: AppTheme.charcoal,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+              ),
+            ),
             onPressed: () {
               _storageService.setAlertMessage(controller.text);
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Alert message updated')),
               );
