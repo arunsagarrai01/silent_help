@@ -44,7 +44,7 @@ class EmergencyRecord {
     'contactCount': contactCount,
     'deliveredCount': deliveredCount,
     'status': status,
-  };
+  };//Map
 
   factory EmergencyRecord.fromJson(Map<String, dynamic> json) {
     return EmergencyRecord(

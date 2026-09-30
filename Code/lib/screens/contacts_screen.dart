@@ -192,7 +192,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
               } catch (e) {
                 _showErrorSnackBar('Error deleting contact: $e');
               }
-            },
+            }, // try catch (error finder)
             child: const Text('Delete'),
           ),
         ],

@@ -40,7 +40,7 @@ class FirebaseService {
         return false;
       }
 
-      await Firebase.initializeApp(options: options);
+      await Firebase.initializeApp(options: options); //Firebase Initialize
 
       // App Check — reduces unauthorised backend access.
       await FirebaseAppCheck.instance.activate(
