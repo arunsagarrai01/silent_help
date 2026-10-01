@@ -6,6 +6,7 @@ import '../services/emergency_service.dart';
 import '../services/storage_service.dart';
 import '../services/foreground_sos_service.dart';
 import '../services/voice_sos_controller.dart';
+import '../services/firestore_sync_service.dart';
 import '../widgets/calculator_button.dart';
 import 'contacts_screen.dart';
 import 'settings_screen.dart'; //imports
@@ -41,19 +42,21 @@ class _CalculatorScreenState extends State<CalculatorScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _sensorService.stopShakeDetection();
-    VoiceSosController.instance.stop();
+    // NOTE: do NOT stop the native voice service here — it must keep running in
+    // the background. It is only stopped when the user disables Voice SOS.
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Voice SOS uses the mic which only works while the app is foregrounded.
-    // Pause it when backgrounded to be a good citizen and avoid false hits.
+    // Voice SOS now runs in a native background foreground service, so we do
+    // NOT stop it when the app is backgrounded — that is the whole point: it
+    // must keep listening with the screen off, like shake detection.
     if (state == AppLifecycleState.resumed) {
+      // Make sure it's running if enabled (e.g. first launch / after boot).
       VoiceSosController.instance.startIfEnabled();
-    } else if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive) {
-      VoiceSosController.instance.stop();
+      // Opportunistically push any local emergency records to the cloud.
+      FirestoreSyncService.instance.syncPending();
     }
   }
 
@@ -78,6 +81,9 @@ class _CalculatorScreenState extends State<CalculatorScreen>
     }
     // Start Voice SOS (UI isolate) if the user enabled it.
     await VoiceSosController.instance.startIfEnabled();
+
+    // Nudge cloud sync (no-op if Firebase not configured / offline).
+    FirestoreSyncService.instance.syncPending();
   }
 
   void _onShakeDetected(int shakeCount) {

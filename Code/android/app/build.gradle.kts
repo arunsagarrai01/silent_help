@@ -5,6 +5,13 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Apply Firebase Gradle plugins ONLY when google-services.json exists.
+// This keeps the project building before `flutterfire configure` is run.
+if (project.file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+    apply(plugin = "com.google.firebase.crashlytics")
+}
+
 android {
     namespace = "com.arunsagarrai.example.silent_help"
     compileSdk = flutter.compileSdkVersion

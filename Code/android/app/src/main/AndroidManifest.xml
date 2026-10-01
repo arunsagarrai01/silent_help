@@ -63,6 +63,14 @@
             android:foregroundServiceType="location|dataSync|microphone"
             android:exported="false" />
 
+        <!-- Native background voice-trigger SOS service. Runs SpeechRecognizer
+             continuously and sends SMS directly from native code for speed and
+             background reliability. -->
+        <service
+            android:name=".VoiceSosService"
+            android:foregroundServiceType="microphone"
+            android:exported="false" />
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
