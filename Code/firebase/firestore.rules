@@ -46,16 +46,20 @@ service cloud.firestore {
     }
 
     // ---- trustedContacts/{contactId} ----
-    // Each contact doc must carry ownerUid == the caller.
+    // Each contact doc must carry ownerUid == the caller. Doc id must equal the
+    // local contact id so upserts are idempotent.
     match /trustedContacts/{contactId} {
       allow read: if isSignedIn() && resource.data.ownerUid == request.auth.uid;
       allow create: if isSignedIn()
                     && request.resource.data.ownerUid == request.auth.uid
+                    && request.resource.data.id == contactId
                     && request.resource.data.keys().hasOnly(
-                         ['ownerUid', 'name', 'phoneHash', 'updatedAt']);
+                         ['id', 'ownerUid', 'name', 'phone', 'updatedAt']);
       allow update: if isSignedIn()
                     && resource.data.ownerUid == request.auth.uid
-                    && request.resource.data.ownerUid == request.auth.uid;
+                    && request.resource.data.ownerUid == request.auth.uid
+                    && request.resource.data.keys().hasOnly(
+                         ['id', 'ownerUid', 'name', 'phone', 'updatedAt']);
       allow delete: if isSignedIn() && resource.data.ownerUid == request.auth.uid;
     }
 

@@ -3,8 +3,17 @@ import '../constants/app_theme.dart';
 import '../models/contact.dart';
 import '../services/storage_service.dart';
 import '../services/voice_sos_controller.dart';
+import '../services/firestore_sync_service.dart';
 
-/// Screen for managing trusted emergency contacts
+/// Screen for managing trusted emergency contacts.
+///
+/// Performance notes:
+///  - Contacts are the single source of truth in memory (`_contacts`). CRUD
+///    updates the list optimistically and persists in the background, so the
+///    UI never shows a full-screen spinner after the first load.
+///  - List items are `const`-friendly and keyed so Flutter can reuse elements.
+///  - Cloud backup (Firestore) and the native voice-service config are refreshed
+///    in the background — never blocking the UI.
 class ContactsScreen extends StatefulWidget {
   const ContactsScreen({super.key});
 
@@ -26,8 +35,6 @@ class _ContactsScreenState extends State<ContactsScreen> {
   Future<void> _loadContacts() async {
     try {
       final contacts = await _storageService.getContacts();
-      // Keep the background voice service's contact list up to date.
-      VoiceSosController.instance.refreshConfig();
       if (!mounted) return;
       setState(() {
         _contacts = contacts;
@@ -36,8 +43,54 @@ class _ContactsScreenState extends State<ContactsScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
-      _showErrorSnackBar('Error loading contacts: $e');
+      _showSnack('Error loading contacts: $e', AppTheme.danger);
     }
+  }
+
+  /// Persist current list + propagate to voice service and cloud in background.
+  void _persistAndSync() {
+    // Fire-and-forget; UI already updated optimistically.
+    _storageService.saveContacts(_contacts);
+    VoiceSosController.instance.refreshConfig();
+    FirestoreSyncService.instance.pushContacts();
+  }
+
+  Future<void> _saveContact({
+    Contact? existing,
+    required String name,
+    required String phone,
+  }) async {
+    setState(() {
+      if (existing != null) {
+        final i = _contacts.indexWhere((c) => c.id == existing.id);
+        if (i != -1) {
+          _contacts[i] = existing.copyWith(name: name, phoneNumber: phone);
+        }
+      } else {
+        _contacts = [
+          ..._contacts,
+          Contact(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            name: name,
+            phoneNumber: phone,
+            createdAt: DateTime.now(),
+          ),
+        ];
+      }
+    });
+    _persistAndSync();
+    _showSnack(
+      existing != null ? 'Contact updated' : 'Contact added',
+      AppTheme.success,
+    );
+  }
+
+  void _removeContact(Contact contact) {
+    setState(
+      () => _contacts = _contacts.where((c) => c.id != contact.id).toList(),
+    );
+    _persistAndSync();
+    _showSnack('Contact deleted', AppTheme.success);
   }
 
   void _showAddContactDialog([Contact? existingContact]) {
@@ -88,38 +141,15 @@ class _ContactsScreenState extends State<ContactsScreen> {
                 borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
               ),
             ),
-            onPressed: () async {
+            onPressed: () {
               final name = nameController.text.trim();
               final phone = phoneController.text.trim();
-
               if (name.isEmpty || phone.isEmpty) {
-                _showErrorSnackBar('Please fill in all fields');
+                _showSnack('Please fill in all fields', AppTheme.danger);
                 return;
               }
-
-              try {
-                if (isEditing) {
-                  await _storageService.updateContact(
-                    existingContact.copyWith(name: name, phoneNumber: phone),
-                  );
-                } else {
-                  await _storageService.addContact(
-                    Contact(
-                      id: DateTime.now().millisecondsSinceEpoch.toString(),
-                      name: name,
-                      phoneNumber: phone,
-                      createdAt: DateTime.now(),
-                    ),
-                  );
-                }
-                if (mounted) Navigator.pop(dialogContext);
-                _loadContacts();
-                _showSuccessSnackBar(
-                  isEditing ? 'Contact updated' : 'Contact added',
-                );
-              } catch (e) {
-                _showErrorSnackBar('Error saving contact: $e');
-              }
+              Navigator.pop(dialogContext);
+              _saveContact(existing: existingContact, name: name, phone: phone);
             },
             child: Text(isEditing ? 'Update' : 'Add'),
           ),
@@ -156,7 +186,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
     );
   }
 
-  void _deleteContact(Contact contact) {
+  void _confirmDelete(Contact contact) {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -183,16 +213,10 @@ class _ContactsScreenState extends State<ContactsScreen> {
                 borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
               ),
             ),
-            onPressed: () async {
-              try {
-                await _storageService.deleteContact(contact.id);
-                if (mounted) Navigator.pop(dialogContext);
-                _loadContacts();
-                _showSuccessSnackBar('Contact deleted');
-              } catch (e) {
-                _showErrorSnackBar('Error deleting contact: $e');
-              }
-            }, // try catch (error finder)
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              _removeContact(contact);
+            },
             child: const Text('Delete'),
           ),
         ],
@@ -200,18 +224,11 @@ class _ContactsScreenState extends State<ContactsScreen> {
     );
   }
 
-  void _showErrorSnackBar(String message) {
+  void _showSnack(String message, Color color) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: AppTheme.danger),
-    );
-  }
-
-  void _showSuccessSnackBar(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: AppTheme.success),
-    );
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text(message), backgroundColor: color));
   }
 
   @override
@@ -227,7 +244,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppTheme.lime))
           : _contacts.isEmpty
-          ? _buildEmptyState()
+          ? const _EmptyState()
           : _buildContactsList(),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showAddContactDialog(),
@@ -239,14 +256,37 @@ class _ContactsScreenState extends State<ContactsScreen> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildContactsList() {
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: _contacts.length,
+      // Reuse elements efficiently; items are keyed by contact id.
+      itemBuilder: (context, index) {
+        final contact = _contacts[index];
+        return _ContactCard(
+          key: ValueKey(contact.id),
+          contact: contact,
+          onEdit: () => _showAddContactDialog(contact),
+          onDelete: () => _confirmDelete(contact),
+        );
+      },
+    );
+  }
+}
+
+/// Extracted const-friendly empty state so it is not rebuilt with the list.
+class _EmptyState extends StatelessWidget {
+  const _EmptyState();
+
+  @override
+  Widget build(BuildContext context) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
             padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: AppTheme.limeSoft,
               shape: BoxShape.circle,
             ),
@@ -275,88 +315,93 @@ class _ContactsScreenState extends State<ContactsScreen> {
       ),
     );
   }
+}
 
-  Widget _buildContactsList() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _contacts.length,
-      itemBuilder: (context, index) {
-        final contact = _contacts[index];
-        return Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          decoration: BoxDecoration(
-            color: AppTheme.card,
-            borderRadius: BorderRadius.circular(AppTheme.radius),
-            boxShadow: AppTheme.softShadow,
+/// A single contact row. Stateless + keyed so the list rebuilds cheaply.
+class _ContactCard extends StatelessWidget {
+  final Contact contact;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  const _ContactCard({
+    super.key,
+    required this.contact,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: AppTheme.card,
+        borderRadius: BorderRadius.circular(AppTheme.radius),
+        boxShadow: AppTheme.softShadow,
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        leading: Container(
+          width: 46,
+          height: 46,
+          alignment: Alignment.center,
+          decoration: const BoxDecoration(
+            gradient: AppTheme.limeGradient,
+            shape: BoxShape.circle,
           ),
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 6,
-            ),
-            leading: Container(
-              width: 46,
-              height: 46,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                gradient: AppTheme.limeGradient,
-                shape: BoxShape.circle,
-              ),
-              child: Text(
-                contact.name.isNotEmpty ? contact.name[0].toUpperCase() : '?',
-                style: const TextStyle(
-                  color: AppTheme.charcoal,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 18,
-                ),
-              ),
-            ),
-            title: Text(
-              contact.name,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                color: AppTheme.charcoal,
-              ),
-            ),
-            subtitle: Text(
-              contact.phoneNumber,
-              style: const TextStyle(color: AppTheme.grey),
-            ),
-            trailing: PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert, color: AppTheme.grey),
-              onSelected: (value) {
-                if (value == 'edit') {
-                  _showAddContactDialog(contact);
-                } else if (value == 'delete') {
-                  _deleteContact(contact);
-                }
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'edit',
-                  child: Row(
-                    children: [
-                      Icon(Icons.edit, size: 20, color: AppTheme.charcoal),
-                      SizedBox(width: 8),
-                      Text('Edit'),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete, size: 20, color: AppTheme.danger),
-                      SizedBox(width: 8),
-                      Text('Delete', style: TextStyle(color: AppTheme.danger)),
-                    ],
-                  ),
-                ),
-              ],
+          child: Text(
+            contact.name.isNotEmpty ? contact.name[0].toUpperCase() : '?',
+            style: const TextStyle(
+              color: AppTheme.charcoal,
+              fontWeight: FontWeight.w800,
+              fontSize: 18,
             ),
           ),
-        );
-      },
+        ),
+        title: Text(
+          contact.name,
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            color: AppTheme.charcoal,
+          ),
+        ),
+        subtitle: Text(
+          contact.phoneNumber,
+          style: const TextStyle(color: AppTheme.grey),
+        ),
+        trailing: PopupMenuButton<String>(
+          icon: const Icon(Icons.more_vert, color: AppTheme.grey),
+          onSelected: (value) {
+            if (value == 'edit') {
+              onEdit();
+            } else if (value == 'delete') {
+              onDelete();
+            }
+          },
+          itemBuilder: (context) => const [
+            PopupMenuItem(
+              value: 'edit',
+              child: Row(
+                children: [
+                  Icon(Icons.edit, size: 20, color: AppTheme.charcoal),
+                  SizedBox(width: 8),
+                  Text('Edit'),
+                ],
+              ),
+            ),
+            PopupMenuItem(
+              value: 'delete',
+              child: Row(
+                children: [
+                  Icon(Icons.delete, size: 20, color: AppTheme.danger),
+                  SizedBox(width: 8),
+                  Text('Delete', style: TextStyle(color: AppTheme.danger)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

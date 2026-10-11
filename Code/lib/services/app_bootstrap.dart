@@ -15,12 +15,23 @@ import 'messaging_service.dart';
 class AppBootstrap {
   AppBootstrap._();
 
-  /// Call once, after runApp. Never throws.
-  static Future<void> initCloud() async {
+  /// Core Firebase init. Awaited in main() BEFORE runApp so Firebase is ready
+  /// when the first screen builds. Never throws; returns whether Firebase came
+  /// up. If false, the app runs fully in local-only mode.
+  static Future<bool> initCore() async {
     try {
-      final ok = await FirebaseService.instance.init();
-      if (!ok) return; // running local-only
+      return await FirebaseService.instance.init();
+    } catch (e) {
+      debugPrint('AppBootstrap.initCore failed (local-only): $e');
+      return false;
+    }
+  }
 
+  /// Secondary services (auth, Crashlytics, FCM, sync). Fire-and-forget AFTER
+  /// runApp so they never delay first frame. Safe no-op if Firebase isn't up.
+  static Future<void> initServices() async {
+    if (!FirebaseService.instance.ready) return; // local-only
+    try {
       // Crashlytics — capture Flutter + platform errors (no sensitive data).
       FlutterError.onError = (details) {
         FirebaseCrashlytics.instance.recordFlutterFatalError(details);
@@ -32,11 +43,10 @@ class AppBootstrap {
 
       await FirebaseService.instance.ensureSignedIn();
 
-      // Secondary services (safe to run in background).
       unawaited(MessagingService.instance.start());
       unawaited(FirestoreSyncService.instance.start());
     } catch (e) {
-      debugPrint('AppBootstrap.initCloud failed (local-only): $e');
+      debugPrint('AppBootstrap.initServices failed (local-only): $e');
     }
   }
 }

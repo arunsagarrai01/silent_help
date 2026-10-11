@@ -43,6 +43,9 @@ class VoiceSosController {
       return false;
     }
 
+    // The native service sends SMS directly, so SEND_SMS must be granted too.
+    await PermissionService.requestSms();
+
     _speech ??= SpeechService(
       onPermissionGranted: () => _active = true,
       onPermissionDenied: () => _active = false,

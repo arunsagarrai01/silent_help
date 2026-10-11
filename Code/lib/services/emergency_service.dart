@@ -72,8 +72,9 @@ class EmergencyService {
         return EmergencyResult.noContacts;
       }
 
-      // 3. Best available location (best-effort; never blocks the send).
-      final Position? position = await LocationService.getBestLocation();
+      // 3. Fast location (last-known instantly + max 2s fresh attempt). This
+      //    guarantees the SMS is never delayed more than ~2s by GPS.
+      final Position? position = await LocationService.getFastLocation();
 
       // 4. Message.
       final baseMessage = await _storage.getAlertMessage();
@@ -84,24 +85,9 @@ class EmergencyService {
         timestamp: DateTime.now(), //Date and time
       );
 
-      // 5. Guard against a device that cannot send SMS at all.
-      final capable = await SmsService.isSmsCapable();
-      final hasSim = await SmsService.hasReadySim();
-      if (!capable || !hasSim) {
-        await _saveHistory(
-          triggerType: triggerType,
-          message: fullMessage,
-          position: position,
-          contactCount: contacts.length,
-          deliveredCount: 0,
-          status: !hasSim
-              ? 'No SIM / SMS unavailable'
-              : 'Device not SMS capable',
-        );
-        return EmergencyResult.smsUnavailable;
-      }
-
-      // 6. Auto-send to everyone.
+      // 5. Auto-send to everyone IMMEDIATELY. We skip pre-checks (SIM/capable)
+      //    here because they add latency; SmsService already fails gracefully
+      //    per-recipient, and sending is the priority in an emergency.
       final results = await SmsService.sendToAll(
         phoneNumbers: contacts.map((c) => c.phoneNumber).toList(),
         message: fullMessage,

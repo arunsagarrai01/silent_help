@@ -6,7 +6,7 @@ import 'screens/calculator_screen.dart';
 import 'services/app_bootstrap.dart';
 import 'services/foreground_sos_service.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Required so the UI isolate can receive messages from the background
@@ -24,11 +24,15 @@ void main() {
     ),
   );
 
-  // Show UI immediately, then bring up the optional Firebase cloud layer in the
-  // background. The app is fully usable (local SOS) whether or not this
-  // succeeds — Firebase is never on the critical path.
+  // Initialise Firebase core BEFORE runApp (guarded — if not configured yet,
+  // the app simply runs in local-only mode without crashing).
+  await AppBootstrap.initCore();
+
   runApp(const SilentHelpApp());
-  AppBootstrap.initCloud();
+
+  // Bring up the secondary cloud services (auth, FCM, sync, Crashlytics) after
+  // the first frame so they never delay startup. Never on the critical path.
+  AppBootstrap.initServices();
 }
 
 class SilentHelpApp extends StatelessWidget {

@@ -11,16 +11,16 @@ enum UserRole { user, trustedContact, admin }
 
 extension UserRoleName on UserRole {
   String get value => switch (this) {
-        UserRole.user => 'user',
-        UserRole.trustedContact => 'trusted_contact',
-        UserRole.admin => 'admin',
-      };
+    UserRole.user => 'user',
+    UserRole.trustedContact => 'trusted_contact',
+    UserRole.admin => 'admin',
+  };
 
   static UserRole fromString(String? s) => switch (s) {
-        'trusted_contact' => UserRole.trustedContact,
-        'admin' => UserRole.admin,
-        _ => UserRole.user,
-      };
+    'trusted_contact' => UserRole.trustedContact,
+    'admin' => UserRole.admin,
+    _ => UserRole.user,
+  };
 }
 
 /// users/{uid}
@@ -33,9 +33,9 @@ class UserProfile {
 
   /// Fields a client is allowed to write. Note: `role` is NOT here.
   Map<String, dynamic> toClientMap() => {
-        'displayName': displayName,
-        'updatedAt': DateTime.now().toUtc().toIso8601String(),
-      };
+    'displayName': displayName,
+    'updatedAt': DateTime.now().toUtc().toIso8601String(),
+  };
 
   factory UserProfile.fromMap(String uid, Map<String, dynamic> map) {
     return UserProfile(
@@ -74,20 +74,64 @@ class CloudEmergencyEvent {
   });
 
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'ownerUid': ownerUid,
-        'triggerType': triggerType,
-        'timestamp': timestamp.toUtc().toIso8601String(),
-        // Coarsen location to ~100m to minimise stored precision.
-        if (latitude != null) 'lat': _coarsen(latitude!),
-        if (longitude != null) 'lng': _coarsen(longitude!),
-        'contactCount': contactCount,
-        'deliveredCount': deliveredCount,
-        'status': status,
-        'source': 'mobile',
-      };
+    'id': id,
+    'ownerUid': ownerUid,
+    'triggerType': triggerType,
+    'timestamp': timestamp.toUtc().toIso8601String(),
+    // Coarsen location to ~100m to minimise stored precision.
+    if (latitude != null) 'lat': _coarsen(latitude!),
+    if (longitude != null) 'lng': _coarsen(longitude!),
+    'contactCount': contactCount,
+    'deliveredCount': deliveredCount,
+    'status': status,
+    'source': 'mobile',
+  };
 
   static double _coarsen(double v) => (v * 1000).roundToDouble() / 1000;
+}
+
+/// trustedContacts/{contactId}
+///
+/// Cloud backup of a trusted contact so the list survives reinstall / is
+/// available across the owner's devices. The LOCAL copy remains authoritative
+/// for the critical SOS path; this is a secondary mirror only.
+///
+/// [id] is the local contact id, reused as the Firestore doc id for idempotent
+/// upserts (no duplicates on re-sync).
+class CloudContact {
+  final String id;
+  final String ownerUid;
+  final String name;
+  final String phone;
+  final DateTime updatedAt;
+
+  CloudContact({
+    required this.id,
+    required this.ownerUid,
+    required this.name,
+    required this.phone,
+    required this.updatedAt,
+  });
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'ownerUid': ownerUid,
+    'name': name,
+    'phone': phone,
+    'updatedAt': updatedAt.toUtc().toIso8601String(),
+  };
+
+  factory CloudContact.fromMap(Map<String, dynamic> map) {
+    return CloudContact(
+      id: map['id'] as String,
+      ownerUid: map['ownerUid'] as String? ?? '',
+      name: map['name'] as String? ?? '',
+      phone: map['phone'] as String? ?? '',
+      updatedAt:
+          DateTime.tryParse(map['updatedAt'] as String? ?? '') ??
+          DateTime.now(),
+    );
+  }
 }
 
 /// notificationTokens/{tokenId}
@@ -98,8 +142,8 @@ class DeviceToken {
   DeviceToken({required this.token, required this.platform});
 
   Map<String, dynamic> toMap() => {
-        'token': token,
-        'platform': platform,
-        'updatedAt': DateTime.now().toUtc().toIso8601String(),
-      };
+    'token': token,
+    'platform': platform,
+    'updatedAt': DateTime.now().toUtc().toIso8601String(),
+  };
 }

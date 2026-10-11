@@ -21,13 +21,20 @@ void startSosCallback() {
 /// SpeechRecognizer requires an Activity + platform channel, which are not
 /// available in a background isolate.
 class SosTaskHandler extends TaskHandler {
-  static const double _shakeThreshold = 17.0;
-  static const double _minShakeMagnitude = 14.0;
-  static const int _shakeWindowMs = 2000;
+  // Shake tuning. We work with GRAVITY-COMPENSATED acceleration: a stationary
+  // phone reads ~0, a deliberate shake spikes well above 12 m/s^2. This is far
+  // more accurate than raw magnitude (which sits at ~9.8 at rest).
+  static const double _gravity = 9.81;
+  static const double _shakeDelta = 12.0; // net accel above gravity to count
+  static const int _shakeWindowMs = 1500;
+  // Ignore sensor data for a short period after start so startup/motion
+  // transients (e.g. tapping the toggle) can never fire a false SOS.
+  static const int _armingDelayMs = 3000;
 
   StreamSubscription<AccelerometerEvent>? _accelSub;
   final List<DateTime> _shakeTimestamps = [];
   DateTime? _lastTriggerTime;
+  DateTime? _armedAt;
 
   int _requiredShakeCount = 3;
   bool _handling = false;
@@ -40,29 +47,41 @@ class SosTaskHandler extends TaskHandler {
 
   void _startListening() {
     _accelSub?.cancel();
+    _shakeTimestamps.clear();
+    // Arm only after a delay — this is the fix for the "fires immediately when
+    // I enable monitoring" bug.
+    _armedAt = DateTime.now().add(const Duration(milliseconds: _armingDelayMs));
     _accelSub = accelerometerEventStream(
-      samplingPeriod: const Duration(milliseconds: 100),
+      // Fastest practical rate so quick shakes are caught within milliseconds.
+      samplingPeriod: SensorInterval.gameInterval, // ~20ms
     ).listen(_onAccelerometer, onError: (_) {}, cancelOnError: false);
   }
 
   void _onAccelerometer(AccelerometerEvent event) {
+    final now = DateTime.now();
+
+    // Not armed yet → ignore (prevents false trigger right after enabling).
+    if (_armedAt == null || now.isBefore(_armedAt!)) return;
+    if (_handling) return;
+
+    // Gravity-compensated acceleration magnitude.
     final magnitude = sqrt(
       event.x * event.x + event.y * event.y + event.z * event.z,
     );
+    final net = (magnitude - _gravity).abs();
 
-    if (magnitude < _minShakeMagnitude) return;
-    if (magnitude <= _shakeThreshold) return;
+    if (net <= _shakeDelta) return;
 
-    final now = DateTime.now();
     _shakeTimestamps.add(now);
     _shakeTimestamps.removeWhere(
       (t) => now.difference(t).inMilliseconds > _shakeWindowMs,
     );
 
-    if (_shakeTimestamps.length >= _requiredShakeCount &&
-        (_lastTriggerTime == null ||
-            now.difference(_lastTriggerTime!).inSeconds > 60) &&
-        !_handling) {
+    final inCooldown =
+        _lastTriggerTime != null &&
+        now.difference(_lastTriggerTime!).inSeconds < 60;
+
+    if (_shakeTimestamps.length >= _requiredShakeCount && !inCooldown) {
       _lastTriggerTime = now;
       _shakeTimestamps.clear();
       _triggerEmergency();

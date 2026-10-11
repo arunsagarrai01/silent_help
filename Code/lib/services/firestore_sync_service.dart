@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/cloud_models.dart';
+import '../models/contact.dart';
 import '../models/emergency_record.dart';
 import 'firebase_service.dart';
 import 'storage_service.dart';
@@ -33,7 +34,9 @@ class FirestoreSyncService {
   Future<void> start() async {
     if (!FirebaseService.instance.ready) return;
     await FirebaseService.instance.ensureSignedIn();
-    // Initial attempt.
+    // Restore contacts from cloud if this device has none locally.
+    unawaited(restoreContactsIfEmpty());
+    // Initial attempt (events + contacts).
     unawaited(syncPending());
     // React to connectivity changes.
     _sub ??= _connectivity.onConnectivityChanged.listen((results) {
@@ -93,6 +96,96 @@ class FirestoreSyncService {
       debugPrint('FirestoreSync error: $e');
     } finally {
       _syncing = false;
+    }
+
+    // Mirror the current contact list to the cloud (best-effort).
+    unawaited(pushContacts());
+  }
+
+  // --------------------------------------------------------------------------
+  // Trusted contacts cloud backup (local stays authoritative)
+  // --------------------------------------------------------------------------
+
+  /// Upsert all local contacts to Firestore and remove cloud docs that no
+  /// longer exist locally. Idempotent (doc id == local contact id).
+  Future<void> pushContacts() async {
+    final fb = FirebaseService.instance;
+    if (!fb.ready || fb.db == null) return;
+    final conn = await _connectivity.checkConnectivity();
+    if (conn.every((r) => r == ConnectivityResult.none)) return;
+    final user = await fb.ensureSignedIn();
+    if (user == null) return;
+
+    try {
+      final local = await _storage.getContacts();
+      final col = fb.db!.collection('trustedContacts');
+
+      // Upsert local contacts owned by this user.
+      final batch = fb.db!.batch();
+      final localIds = <String>{};
+      for (final c in local) {
+        localIds.add(c.id);
+        final cloud = CloudContact(
+          id: c.id,
+          ownerUid: user.uid,
+          name: c.name,
+          phone: c.phoneNumber,
+          updatedAt: DateTime.now(),
+        );
+        batch.set(col.doc(c.id), cloud.toMap());
+      }
+      await batch.commit();
+
+      // Delete cloud contacts that were removed locally.
+      final remote = await col.where('ownerUid', isEqualTo: user.uid).get();
+      final deletions = fb.db!.batch();
+      var hasDeletions = false;
+      for (final doc in remote.docs) {
+        if (!localIds.contains(doc.id)) {
+          deletions.delete(doc.reference);
+          hasDeletions = true;
+        }
+      }
+      if (hasDeletions) await deletions.commit();
+    } catch (e) {
+      debugPrint('pushContacts error: $e');
+    }
+  }
+
+  /// If local storage has no contacts (e.g. fresh install) but the cloud has
+  /// some for this user, restore them locally.
+  Future<void> restoreContactsIfEmpty() async {
+    final fb = FirebaseService.instance;
+    if (!fb.ready || fb.db == null) return;
+    final conn = await _connectivity.checkConnectivity();
+    if (conn.every((r) => r == ConnectivityResult.none)) return;
+    final user = await fb.ensureSignedIn();
+    if (user == null) return;
+
+    try {
+      final local = await _storage.getContacts();
+      if (local.isNotEmpty) return; // local is authoritative; don't overwrite.
+
+      final remote = await fb.db!
+          .collection('trustedContacts')
+          .where('ownerUid', isEqualTo: user.uid)
+          .get();
+      if (remote.docs.isEmpty) return;
+
+      final restored = remote.docs.map((d) {
+        final cc = CloudContact.fromMap(d.data());
+        return Contact(
+          id: cc.id,
+          name: cc.name,
+          phoneNumber: cc.phone,
+          createdAt: cc.updatedAt,
+        );
+      }).toList();
+
+      await _storage.saveContacts(restored);
+      debugPrint('FirestoreSync: restored ${restored.length} contact(s).');
+    } catch (e) {
+      debugPrint('restoreContactsIfEmpty error: $e');
     }
   }
 

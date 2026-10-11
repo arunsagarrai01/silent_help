@@ -55,6 +55,26 @@ class LocationService {
     }
   }
 
+  /// FAST location for the emergency path: returns the last-known fix
+  /// immediately (no GPS wait), and only attempts a fresh fix with a hard 2s
+  /// cap. This guarantees SMS is never delayed more than ~2 seconds by GPS.
+  static Future<Position?> getFastLocation() async {
+    // 1. Instant cached fix (returns right away on virtually all devices).
+    final cached = await _lastKnown();
+
+    // 2. Try a very short fresh fix, but never block beyond 2 seconds.
+    try {
+      final fresh = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.medium,
+        timeLimit: const Duration(seconds: 2),
+      ).timeout(const Duration(seconds: 2));
+      return fresh;
+    } catch (_) {
+      // Fall back to whatever we had instantly.
+      return cached;
+    }
+  }
+
   static Future<Position?> getCurrentLocation() async {
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();

@@ -7,9 +7,12 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.Manifest
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.media.AudioManager
 import android.os.Build
+import androidx.core.content.ContextCompat
 import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
@@ -168,10 +171,17 @@ class VoiceSosService : Service() {
                     )
                     putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-US")
                     putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
-                    }
+                    putExtra(
+                        RecognizerIntent.EXTRA_CALLING_PACKAGE,
+                        packageName
+                    )
+                    // NOTE: we intentionally do NOT force EXTRA_PREFER_OFFLINE.
+                    // On many devices offline language packs are missing, which
+                    // makes every cycle fail with ERROR_NO_MATCH/LANGUAGE_
+                    // UNAVAILABLE and the trigger never fires. Online recognition
+                    // works reliably; offline is used automatically when ready.
                 }
+                Log.d(TAG, "startListening (phrase='${readPhrase()}')")
                 recognizer?.startListening(intent)
             } catch (e: Exception) {
                 Log.e(TAG, "startRecognition: ${e.message}")
@@ -180,30 +190,49 @@ class VoiceSosService : Service() {
         }
     }
 
-    private fun scheduleRestart() {
+    private fun scheduleRestart(delayMs: Long = 400) {
         if (!running) return
         handler.removeCallbacksAndMessages(null)
-        handler.postDelayed({
-            try {
-                recognizer?.cancel()
-            } catch (_: Exception) {
-            }
-            startRecognition()
-        }, 300)
+        handler.postDelayed({ startRecognition() }, delayMs)
+    }
+
+    /// Fully recreate the recognizer (needed after fatal errors like CLIENT or
+    /// RECOGNIZER_BUSY, where reusing the instance keeps failing).
+    private fun recreateRecognizer() {
+        try {
+            recognizer?.cancel()
+            recognizer?.destroy()
+        } catch (_: Exception) {
+        }
+        recognizer = null
     }
 
     private val listener = object : RecognitionListener {
         override fun onResults(results: Bundle?) {
-            handleMatches(results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION))
+            val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+            Log.d(TAG, "onResults=$matches")
+            handleMatches(matches)
             scheduleRestart()
         }
 
         override fun onPartialResults(partialResults: Bundle?) {
-            handleMatches(partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION))
+            handleMatches(
+                partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+            )
         }
 
         override fun onError(error: Int) {
-            scheduleRestart()
+            Log.d(TAG, "onError=$error")
+            when (error) {
+                // Fatal / recognizer stuck: fully recreate it before retrying.
+                SpeechRecognizer.ERROR_CLIENT,
+                SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> {
+                    recreateRecognizer()
+                    scheduleRestart(600)
+                }
+                // No speech / timeout: just restart quickly (this is normal).
+                else -> scheduleRestart(400)
+            }
         }
 
         override fun onReadyForSpeech(params: Bundle?) {}
@@ -217,16 +246,77 @@ class VoiceSosService : Service() {
     private fun handleMatches(matches: List<String>?) {
         if (matches.isNullOrEmpty()) return
         val phrase = readPhrase()
-        val words = phrase.split(Regex("\\s+")).filter { it.isNotBlank() }
-        if (words.isEmpty()) return
+        val phraseWords = phrase.split(Regex("\\s+")).filter { it.isNotBlank() }
+        if (phraseWords.isEmpty()) return
+
         for (m in matches) {
-            val spoken = m.lowercase().replace(Regex("[^a-z0-9 ]"), " ")
-            if (words.all { spoken.contains(it) }) {
-                Log.d(TAG, "Voice trigger matched")
+            if (isFuzzyMatch(m, phraseWords)) {
+                Log.d(TAG, "Voice trigger matched on: '$m'")
                 triggerSos()
                 return
             }
         }
+    }
+
+    /**
+     * Forgiving wake-phrase match. Speech recognizers routinely mishear
+     * "silent help emergency" as "Silent Hill emergency" / "cylinder
+     * emergency" / just "emergency". Exact word containment therefore fails.
+     *
+     * Strategy: for each phrase word, find the best-matching spoken word using
+     * normalized edit distance. We trigger when a high enough RATIO of phrase
+     * words are matched (>= 60%) AND the last/most distinctive word (e.g.
+     * "emergency") matches — a good balance of reliability vs false positives.
+     */
+    private fun isFuzzyMatch(spokenRaw: String, phraseWords: List<String>): Boolean {
+        val spoken = spokenRaw.lowercase().replace(Regex("[^a-z0-9 ]"), " ")
+        val spokenWords = spoken.split(Regex("\\s+")).filter { it.isNotBlank() }
+        if (spokenWords.isEmpty()) return false
+
+        var matched = 0
+        for (pw in phraseWords) {
+            val hit = spokenWords.any { sw -> wordsSimilar(pw, sw) }
+            if (hit) matched++
+        }
+
+        val ratio = matched.toDouble() / phraseWords.size
+        // The last phrase word is treated as the required "key" word.
+        val keyWord = phraseWords.last()
+        val keyPresent = spokenWords.any { sw -> wordsSimilar(keyWord, sw) }
+
+        return keyPresent && ratio >= 0.6
+    }
+
+    /** Two words are "similar" if equal, one contains the other, or their
+     *  Levenshtein distance is small relative to length. */
+    private fun wordsSimilar(a: String, b: String): Boolean {
+        if (a == b) return true
+        if (a.length >= 3 && b.length >= 3 && (a.contains(b) || b.contains(a))) {
+            return true
+        }
+        val dist = levenshtein(a, b)
+        val maxLen = maxOf(a.length, b.length)
+        if (maxLen == 0) return false
+        // Allow ~40% character difference (handles Hill/help, etc.).
+        return dist.toDouble() / maxLen <= 0.4
+    }
+
+    private fun levenshtein(a: String, b: String): Int {
+        val dp = IntArray(b.length + 1) { it }
+        for (i in 1..a.length) {
+            var prev = dp[0]
+            dp[0] = i
+            for (j in 1..b.length) {
+                val temp = dp[j]
+                dp[j] = minOf(
+                    dp[j] + 1,
+                    dp[j - 1] + 1,
+                    prev + if (a[i - 1] == b[j - 1]) 0 else 1
+                )
+                prev = temp
+            }
+        }
+        return dp[b.length]
     }
 
     private fun config() = getSharedPreferences(CONFIG_PREFS, Context.MODE_PRIVATE)
@@ -261,7 +351,17 @@ class VoiceSosService : Service() {
         return "$base\nTriggered by: Voice SOS"
     }
 
+    private fun hasSmsPermission(): Boolean {
+        return ContextCompat.checkSelfPermission(
+            this, Manifest.permission.SEND_SMS
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
     private fun sendSms(numbers: List<String>, message: String) {
+        if (!hasSmsPermission()) {
+            Log.e(TAG, "SEND_SMS permission NOT granted — cannot send voice SOS")
+            return
+        }
         try {
             val sms = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 getSystemService(SmsManager::class.java)

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "199841425482",
+    "project_id": "silenthelp-5b1ef",
+    "storage_bucket": "silenthelp-5b1ef.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:199841425482:android:af1af3b88fb7fb9665deb3",
+        "android_client_info": {
+          "package_name": "com.arunsagarrai.example.silent_help"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCXKBC8MiKutt214t996pV4ypb0fxRx4z8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

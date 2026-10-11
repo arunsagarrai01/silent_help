@@ -43,14 +43,21 @@ class FirebaseService {
       await Firebase.initializeApp(options: options); //Firebase Initialize
 
       // App Check — reduces unauthorised backend access.
-      await FirebaseAppCheck.instance.activate(
-        androidProvider: kReleaseMode
-            ? AndroidProvider.playIntegrity
-            : AndroidProvider.debug,
-        appleProvider: kReleaseMode
-            ? AppleProvider.appAttest
-            : AppleProvider.debug,
-      );
+      //
+      // Only activated in RELEASE builds (Play Integrity / App Attest). In
+      // debug we skip it so an unregistered debug token can't block Firestore
+      // or spam retries. Enable debug App Check only if you register the debug
+      // token in the Firebase console.
+      if (kReleaseMode) {
+        try {
+          await FirebaseAppCheck.instance.activate(
+            androidProvider: AndroidProvider.playIntegrity,
+            appleProvider: AppleProvider.appAttest,
+          );
+        } catch (e) {
+          debugPrint('App Check activate failed (continuing): $e');
+        }
+      }
 
       // Firestore offline persistence (default on mobile, set explicitly).
       _db = FirebaseFirestore.instance;
