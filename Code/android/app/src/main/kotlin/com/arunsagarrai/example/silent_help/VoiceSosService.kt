@@ -83,13 +83,21 @@ class VoiceSosService : Service() {
     }
 
     private fun startAsForeground() {
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            "Voice monitoring",
-            NotificationManager.IMPORTANCE_LOW
-        ).apply { setSound(null, null) }
         val nm = getSystemService(NotificationManager::class.java)
-        nm.createNotificationChannel(channel)
+        // Create the SILENT channel once. IMPORTANCE_LOW = no sound, no heads-up.
+        if (nm.getNotificationChannel(CHANNEL_ID) == null) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "Voice monitoring",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                setSound(null, null)
+                enableVibration(false)
+                enableLights(false)
+                setShowBadge(false)
+            }
+            nm.createNotificationChannel(channel)
+        }
 
         val launch = packageManager.getLaunchIntentForPackage(packageName)
         val pi = PendingIntent.getActivity(
@@ -103,6 +111,9 @@ class VoiceSosService : Service() {
             .setSmallIcon(android.R.drawable.ic_menu_compass)
             .setContentIntent(pi)
             .setOngoing(true)
+            .setOnlyAlertOnce(true) // never re-alert/sound on updates
+            .setSound(null)
+            .setVibrate(null)
             .build()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -118,34 +129,30 @@ class VoiceSosService : Service() {
 
     // ---- beep suppression ----
     @Suppress("DEPRECATION")
+    // Mute ONCE when the service starts and restore ONCE on destroy. The old
+    // approach toggled mute every recognition cycle, which itself produced
+    // audible artifacts (the "nonstop sound"). We only mute the SYSTEM stream
+    // (where the SpeechRecognizer start/stop beep plays) so media/alarms are
+    // untouched.
     private fun muteBeep() {
         if (muted) return
         muted = true
         try {
-            intArrayOf(
-                AudioManager.STREAM_SYSTEM,
-                AudioManager.STREAM_NOTIFICATION,
-                AudioManager.STREAM_MUSIC
-            ).forEach {
-                audioManager.adjustStreamVolume(it, AudioManager.ADJUST_MUTE, 0)
-            }
+            audioManager.adjustStreamVolume(
+                AudioManager.STREAM_SYSTEM, AudioManager.ADJUST_MUTE, 0
+            )
         } catch (e: Exception) {
             Log.w(TAG, "muteBeep: ${e.message}")
         }
     }
 
-    @Suppress("DEPRECATION")
     private fun unmuteBeep() {
         if (!muted) return
         muted = false
         try {
-            intArrayOf(
-                AudioManager.STREAM_SYSTEM,
-                AudioManager.STREAM_NOTIFICATION,
-                AudioManager.STREAM_MUSIC
-            ).forEach {
-                audioManager.adjustStreamVolume(it, AudioManager.ADJUST_UNMUTE, 0)
-            }
+            audioManager.adjustStreamVolume(
+                AudioManager.STREAM_SYSTEM, AudioManager.ADJUST_UNMUTE, 0
+            )
         } catch (e: Exception) {
             Log.w(TAG, "unmuteBeep: ${e.message}")
         }
