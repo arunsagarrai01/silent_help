@@ -232,10 +232,10 @@ class _CalculatorScreenState extends State<CalculatorScreen>
                     gradient: AppTheme.limeGradient,
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: const Icon(Icons.shield, color: AppTheme.charcoal),
+                  child: Icon(Icons.shield, color: AppTheme.charcoal),
                 ),
                 const SizedBox(width: 12),
-                const Text(
+                Text(
                   'SilentHelp',
                   style: TextStyle(
                     fontSize: 20,
@@ -331,12 +331,12 @@ class _CalculatorScreenState extends State<CalculatorScreen>
         ),
         title: Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.w600,
             color: AppTheme.charcoal,
           ),
         ),
-        trailing: const Icon(Icons.chevron_right, color: AppTheme.grey),
+        trailing: Icon(Icons.chevron_right, color: AppTheme.grey),
         onTap: onTap,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
@@ -380,7 +380,7 @@ class _CalculatorScreenState extends State<CalculatorScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel', style: TextStyle(color: AppTheme.grey)),
+            child: Text('Cancel', style: TextStyle(color: AppTheme.grey)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -413,7 +413,7 @@ class _CalculatorScreenState extends State<CalculatorScreen>
         backgroundColor: Colors.black,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.more_vert, color: Colors.white),
+          icon: Icon(Icons.more_vert, color: Colors.white),
           onPressed: _showHiddenMenu,
         ),
         title: const Text('Calculator', style: TextStyle(color: Colors.white)),
@@ -432,7 +432,7 @@ class _CalculatorScreenState extends State<CalculatorScreen>
                 children: [
                   Text(
                     _display,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 48,
                       fontWeight: FontWeight.w300,
                       color: Colors.white,

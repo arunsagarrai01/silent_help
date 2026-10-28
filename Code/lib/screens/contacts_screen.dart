@@ -111,7 +111,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
         ),
         title: Text(
           isEditing ? 'Edit Contact' : 'Add Trusted Contact',
-          style: const TextStyle(fontWeight: FontWeight.w700),
+          style: TextStyle(fontWeight: FontWeight.w700),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -130,7 +130,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel', style: TextStyle(color: AppTheme.grey)),
+            child: Text('Cancel', style: TextStyle(color: AppTheme.grey)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -202,7 +202,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel', style: TextStyle(color: AppTheme.grey)),
+            child: Text('Cancel', style: TextStyle(color: AppTheme.grey)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -250,7 +250,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
         onPressed: () => _showAddContactDialog(),
         backgroundColor: AppTheme.lime,
         foregroundColor: AppTheme.charcoal,
-        icon: const Icon(Icons.add),
+        icon: Icon(Icons.add),
         label: const Text('Add', style: TextStyle(fontWeight: FontWeight.w700)),
       ),
     );
@@ -286,18 +286,18 @@ class _EmptyState extends StatelessWidget {
         children: [
           Container(
             padding: const EdgeInsets.all(24),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               color: AppTheme.limeSoft,
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.contacts_outlined,
               size: 64,
               color: AppTheme.limeDark,
             ),
           ),
           const SizedBox(height: 20),
-          const Text(
+          Text(
             'No trusted contacts yet',
             style: TextStyle(
               fontSize: 18,
@@ -306,7 +306,7 @@ class _EmptyState extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Add emergency contacts who will receive\nalerts when you need help',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 14, color: AppTheme.grey),
@@ -345,13 +345,13 @@ class _ContactCard extends StatelessWidget {
           width: 46,
           height: 46,
           alignment: Alignment.center,
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: AppTheme.limeGradient,
             shape: BoxShape.circle,
           ),
           child: Text(
             contact.name.isNotEmpty ? contact.name[0].toUpperCase() : '?',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppTheme.charcoal,
               fontWeight: FontWeight.w800,
               fontSize: 18,
@@ -360,17 +360,17 @@ class _ContactCard extends StatelessWidget {
         ),
         title: Text(
           contact.name,
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.w600,
             color: AppTheme.charcoal,
           ),
         ),
         subtitle: Text(
           contact.phoneNumber,
-          style: const TextStyle(color: AppTheme.grey),
+          style: TextStyle(color: AppTheme.grey),
         ),
         trailing: PopupMenuButton<String>(
-          icon: const Icon(Icons.more_vert, color: AppTheme.grey),
+          icon: Icon(Icons.more_vert, color: AppTheme.grey),
           onSelected: (value) {
             if (value == 'edit') {
               onEdit();
@@ -378,7 +378,7 @@ class _ContactCard extends StatelessWidget {
               onDelete();
             }
           },
-          itemBuilder: (context) => const [
+          itemBuilder: (context) => [
             PopupMenuItem(
               value: 'edit',
               child: Row(

@@ -18,9 +18,21 @@ class StorageService {
   static const String _lastTriggerKey = 'last_sos_trigger_ms';
   static const String _monitoringEnabledKey = 'monitoring_enabled';
   static const String _voicePhraseKey = 'voice_trigger_phrase';
+  static const String _themeModeKey = 'theme_mode';
 
   /// Default voice trigger phrase.
   static const String defaultVoicePhrase = 'silent help emergency';
+
+  // Theme mode: 'system' | 'light' | 'dark'
+  Future<String> getThemeMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_themeModeKey) ?? 'system';
+  }
+
+  Future<void> setThemeMode(String mode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_themeModeKey, mode);
+  }
 
   /// Max history entries to retain locally.
   static const int _maxHistory = 50;

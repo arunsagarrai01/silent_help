@@ -1,5 +1,6 @@
 package com.arunsagarrai.example.silent_help
 
+import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -7,12 +8,12 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.Manifest
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
+import android.location.Location
+import android.location.LocationManager
 import android.media.AudioManager
 import android.os.Build
-import androidx.core.content.ContextCompat
 import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
@@ -22,7 +23,11 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.telephony.SmsManager
 import android.util.Log
+import androidx.core.content.ContextCompat
 import org.json.JSONArray
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * Background voice-trigger SOS service.
@@ -30,12 +35,13 @@ import org.json.JSONArray
  * Runs as a foreground service (microphone type) so it keeps listening while
  * the app is minimized or the screen is off. It continuously runs Android's
  * SpeechRecognizer in a self-restarting loop, matches the user's configured
- * trigger phrase, and — on a match — sends SMS DIRECTLY from native code using
- * SmsManager. Sending natively is the fastest path and does not require the
- * Flutter engine to be alive.
+ * trigger phrase (fuzzily, to tolerate mishearings), and — on a match — sends
+ * SMS DIRECTLY from native code using SmsManager. Sending natively is the
+ * fastest path and does not require the Flutter engine to be alive.
  *
- * All configuration (phrase, contacts, message) is read from the SAME
- * SharedPreferences the Flutter app writes to (keys are prefixed "flutter.").
+ * Config (phrase, contacts, message) is read from a dedicated prefs file
+ * written by MainActivity, so it never depends on shared_preferences' internal
+ * encoding.
  */
 class VoiceSosService : Service() {
 
@@ -44,8 +50,6 @@ class VoiceSosService : Service() {
         const val NOTIF_ID = 8422
         const val TAG = "VoiceSosService"
 
-        // Dedicated config prefs written by MainActivity (format-independent,
-        // does not rely on shared_preferences internal encoding).
         const val CONFIG_PREFS = "silent_help_voice_config"
         const val CFG_PHRASE = "phrase"
         const val CFG_CONTACTS = "contactsJson"
@@ -54,11 +58,20 @@ class VoiceSosService : Service() {
 
         const val DEFAULT_PHRASE = "silent help emergency"
         const val COOLDOWN_MS = 60_000L
+
+        // After a successful match we pause recognition briefly, then resume so
+        // the trigger keeps working for the next incident.
+        const val POST_TRIGGER_RESUME_MS = 2_000L
     }
 
     private var recognizer: SpeechRecognizer? = null
     private var running = false
     private var muted = false
+
+    // Guards against the same utterance firing SOS more than once (partial +
+    // final results, or rapid repeats). Reset when we resume listening.
+    private var triggeredThisUtterance = false
+
     private val handler = Handler(Looper.getMainLooper())
 
     private val audioManager by lazy {
@@ -78,13 +91,12 @@ class VoiceSosService : Service() {
             muteBeep()
             startRecognition()
         }
-        // START_STICKY: the OS restarts the service if it is killed.
         return START_STICKY
     }
 
+    // ---- foreground notification (silent) ----
     private fun startAsForeground() {
         val nm = getSystemService(NotificationManager::class.java)
-        // Create the SILENT channel once. IMPORTANCE_LOW = no sound, no heads-up.
         if (nm.getNotificationChannel(CHANNEL_ID) == null) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
@@ -111,16 +123,14 @@ class VoiceSosService : Service() {
             .setSmallIcon(android.R.drawable.ic_menu_compass)
             .setContentIntent(pi)
             .setOngoing(true)
-            .setOnlyAlertOnce(true) // never re-alert/sound on updates
+            .setOnlyAlertOnce(true)
             .setSound(null)
             .setVibrate(null)
             .build()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(
-                NOTIF_ID,
-                notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                NOTIF_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
             )
         } else {
             startForeground(NOTIF_ID, notification)
@@ -128,33 +138,38 @@ class VoiceSosService : Service() {
     }
 
     // ---- beep suppression ----
-    @Suppress("DEPRECATION")
-    // Mute ONCE when the service starts and restore ONCE on destroy. The old
-    // approach toggled mute every recognition cycle, which itself produced
-    // audible artifacts (the "nonstop sound"). We only mute the SYSTEM stream
-    // (where the SpeechRecognizer start/stop beep plays) so media/alarms are
-    // untouched.
+    //
+    // The SpeechRecognizer start/stop "beep" plays through the SYSTEM /
+    // NOTIFICATION streams (ToneGenerator). We mute THOSE continuously while the
+    // service runs — they never carry the user's media, so this is safe and
+    // does not affect music/alarms. (Muting STREAM_MUSIC would silence the
+    // user's media the whole time, which we deliberately avoid.)
+    private val mutedStreams = intArrayOf(
+        AudioManager.STREAM_SYSTEM,
+        AudioManager.STREAM_NOTIFICATION
+    )
+
     private fun muteBeep() {
         if (muted) return
         muted = true
-        try {
-            audioManager.adjustStreamVolume(
-                AudioManager.STREAM_SYSTEM, AudioManager.ADJUST_MUTE, 0
-            )
-        } catch (e: Exception) {
-            Log.w(TAG, "muteBeep: ${e.message}")
+        for (s in mutedStreams) {
+            try {
+                audioManager.adjustStreamVolume(s, AudioManager.ADJUST_MUTE, 0)
+            } catch (e: Exception) {
+                Log.w(TAG, "muteBeep($s): ${e.message}")
+            }
         }
     }
 
     private fun unmuteBeep() {
         if (!muted) return
         muted = false
-        try {
-            audioManager.adjustStreamVolume(
-                AudioManager.STREAM_SYSTEM, AudioManager.ADJUST_UNMUTE, 0
-            )
-        } catch (e: Exception) {
-            Log.w(TAG, "unmuteBeep: ${e.message}")
+        for (s in mutedStreams) {
+            try {
+                audioManager.adjustStreamVolume(s, AudioManager.ADJUST_UNMUTE, 0)
+            } catch (e: Exception) {
+                Log.w(TAG, "unmuteBeep($s): ${e.message}")
+            }
         }
     }
 
@@ -166,10 +181,18 @@ class VoiceSosService : Service() {
             return
         }
         handler.post {
+            if (!running) return@post
+            // A fresh utterance begins: allow one trigger again.
+            triggeredThisUtterance = false
             try {
                 if (recognizer == null) {
                     recognizer = SpeechRecognizer.createSpeechRecognizer(this)
                     recognizer?.setRecognitionListener(listener)
+                }
+                // Always cancel any pending session first to avoid BUSY.
+                try {
+                    recognizer?.cancel()
+                } catch (_: Exception) {
                 }
                 val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                     putExtra(
@@ -178,21 +201,13 @@ class VoiceSosService : Service() {
                     )
                     putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-US")
                     putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-                    putExtra(
-                        RecognizerIntent.EXTRA_CALLING_PACKAGE,
-                        packageName
-                    )
-                    // NOTE: we intentionally do NOT force EXTRA_PREFER_OFFLINE.
-                    // On many devices offline language packs are missing, which
-                    // makes every cycle fail with ERROR_NO_MATCH/LANGUAGE_
-                    // UNAVAILABLE and the trigger never fires. Online recognition
-                    // works reliably; offline is used automatically when ready.
+                    putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, packageName)
+                    // Do NOT force offline — missing packs break recognition.
                 }
-                Log.d(TAG, "startListening (phrase='${readPhrase()}')")
                 recognizer?.startListening(intent)
             } catch (e: Exception) {
                 Log.e(TAG, "startRecognition: ${e.message}")
-                scheduleRestart()
+                scheduleRestart(600)
             }
         }
     }
@@ -203,8 +218,7 @@ class VoiceSosService : Service() {
         handler.postDelayed({ startRecognition() }, delayMs)
     }
 
-    /// Fully recreate the recognizer (needed after fatal errors like CLIENT or
-    /// RECOGNIZER_BUSY, where reusing the instance keeps failing).
+    /** Fully recreate the recognizer (needed after fatal CLIENT/BUSY errors). */
     private fun recreateRecognizer() {
         try {
             recognizer?.cancel()
@@ -218,27 +232,27 @@ class VoiceSosService : Service() {
         override fun onResults(results: Bundle?) {
             val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
             Log.d(TAG, "onResults=$matches")
-            handleMatches(matches)
-            scheduleRestart()
+            val fired = handleMatches(matches)
+            // Always resume listening so the trigger keeps working repeatedly.
+            scheduleRestart(if (fired) POST_TRIGGER_RESUME_MS else 400)
         }
 
         override fun onPartialResults(partialResults: Bundle?) {
+            // Fast path: react to partials too, but the per-utterance guard
+            // prevents a double fire with onResults.
             handleMatches(
                 partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
             )
         }
 
         override fun onError(error: Int) {
-            Log.d(TAG, "onError=$error")
             when (error) {
-                // Fatal / recognizer stuck: fully recreate it before retrying.
                 SpeechRecognizer.ERROR_CLIENT,
                 SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> {
                     recreateRecognizer()
-                    scheduleRestart(600)
+                    scheduleRestart(700)
                 }
-                // No speech / timeout: just restart quickly (this is normal).
-                else -> scheduleRestart(400)
+                else -> scheduleRestart(400) // NO_MATCH / timeout = normal
             }
         }
 
@@ -250,30 +264,30 @@ class VoiceSosService : Service() {
         override fun onEvent(eventType: Int, params: Bundle?) {}
     }
 
-    private fun handleMatches(matches: List<String>?) {
-        if (matches.isNullOrEmpty()) return
-        val phrase = readPhrase()
-        val phraseWords = phrase.split(Regex("\\s+")).filter { it.isNotBlank() }
-        if (phraseWords.isEmpty()) return
+    /** Returns true if a trigger fired. */
+    private fun handleMatches(matches: List<String>?): Boolean {
+        if (matches.isNullOrEmpty()) return false
+        if (triggeredThisUtterance) return false
+
+        val phraseWords = readPhrase()
+            .split(Regex("\\s+")).filter { it.isNotBlank() }
+        if (phraseWords.isEmpty()) return false
 
         for (m in matches) {
             if (isFuzzyMatch(m, phraseWords)) {
                 Log.d(TAG, "Voice trigger matched on: '$m'")
+                triggeredThisUtterance = true
                 triggerSos()
-                return
+                return true
             }
         }
+        return false
     }
 
     /**
-     * Forgiving wake-phrase match. Speech recognizers routinely mishear
-     * "silent help emergency" as "Silent Hill emergency" / "cylinder
-     * emergency" / just "emergency". Exact word containment therefore fails.
-     *
-     * Strategy: for each phrase word, find the best-matching spoken word using
-     * normalized edit distance. We trigger when a high enough RATIO of phrase
-     * words are matched (>= 60%) AND the last/most distinctive word (e.g.
-     * "emergency") matches — a good balance of reliability vs false positives.
+     * Forgiving wake-phrase match: trigger when >= 60% of phrase words match
+     * (fuzzily) AND the last/most distinctive word matches. Tolerates common
+     * mishearings like "silent help" -> "Silent Hill".
      */
     private fun isFuzzyMatch(spokenRaw: String, phraseWords: List<String>): Boolean {
         val spoken = spokenRaw.lowercase().replace(Regex("[^a-z0-9 ]"), " ")
@@ -282,29 +296,19 @@ class VoiceSosService : Service() {
 
         var matched = 0
         for (pw in phraseWords) {
-            val hit = spokenWords.any { sw -> wordsSimilar(pw, sw) }
-            if (hit) matched++
+            if (spokenWords.any { sw -> wordsSimilar(pw, sw) }) matched++
         }
-
         val ratio = matched.toDouble() / phraseWords.size
-        // The last phrase word is treated as the required "key" word.
-        val keyWord = phraseWords.last()
-        val keyPresent = spokenWords.any { sw -> wordsSimilar(keyWord, sw) }
-
+        val keyPresent = spokenWords.any { sw -> wordsSimilar(phraseWords.last(), sw) }
         return keyPresent && ratio >= 0.6
     }
 
-    /** Two words are "similar" if equal, one contains the other, or their
-     *  Levenshtein distance is small relative to length. */
     private fun wordsSimilar(a: String, b: String): Boolean {
         if (a == b) return true
-        if (a.length >= 3 && b.length >= 3 && (a.contains(b) || b.contains(a))) {
-            return true
-        }
+        if (a.length >= 3 && b.length >= 3 && (a.contains(b) || b.contains(a))) return true
         val dist = levenshtein(a, b)
         val maxLen = maxOf(a.length, b.length)
         if (maxLen == 0) return false
-        // Allow ~40% character difference (handles Hill/help, etc.).
         return dist.toDouble() / maxLen <= 0.4
     }
 
@@ -331,8 +335,6 @@ class VoiceSosService : Service() {
     // ---- SOS ----
     private fun triggerSos() {
         val prefs = config()
-
-        // Cooldown.
         val last = prefs.getLong(CFG_LAST_TRIGGER, 0L)
         val now = System.currentTimeMillis()
         if (now - last < COOLDOWN_MS) {
@@ -346,16 +348,64 @@ class VoiceSosService : Service() {
             Log.w(TAG, "No trusted contacts")
             return
         }
-        val message = buildMessage()
-        sendSms(numbers, message)
+        sendSms(numbers, buildMessage())
     }
 
     private fun buildMessage(): String {
         val base = config().getString(CFG_MESSAGE, null)
             ?: "Emergency! I need help. This is an automated message from SilentHelp."
-        // Location is best-effort; native quick path sends without a fix to be
-        // fast. The Flutter path still records full history with location.
-        return "$base\nTriggered by: Voice SOS"
+
+        val sb = StringBuilder(base)
+
+        // Time.
+        val time = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+            .format(Date())
+        sb.append("\nTime: ").append(time)
+
+        // Location (last-known, instant — never delays the SMS).
+        val loc = lastKnownLocation()
+        if (loc != null) {
+            sb.append("\nLocation: https://maps.google.com/?q=")
+                .append(loc.latitude).append(",").append(loc.longitude)
+        } else {
+            sb.append("\nLocation: unavailable")
+        }
+
+        sb.append("\nTriggered by: Voice SOS")
+        return sb.toString()
+    }
+
+    /** Fast, non-blocking last-known location from GPS or network provider. */
+    private fun lastKnownLocation(): Location? {
+        val fineOk = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        val coarseOk = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!fineOk && !coarseOk) return null
+
+        return try {
+            val lm = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+            val providers = listOf(
+                LocationManager.GPS_PROVIDER,
+                LocationManager.NETWORK_PROVIDER,
+                LocationManager.PASSIVE_PROVIDER
+            )
+            var best: Location? = null
+            for (p in providers) {
+                val l = try {
+                    lm.getLastKnownLocation(p)
+                } catch (_: SecurityException) {
+                    null
+                }
+                if (l != null && (best == null || l.time > best!!.time)) best = l
+            }
+            best
+        } catch (e: Exception) {
+            Log.w(TAG, "lastKnownLocation: ${e.message}")
+            null
+        }
     }
 
     private fun hasSmsPermission(): Boolean {

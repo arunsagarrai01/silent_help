@@ -5,6 +5,7 @@ import '../services/emergency_service.dart';
 import '../services/foreground_sos_service.dart';
 import '../services/permission_service.dart';
 import '../services/voice_sos_controller.dart';
+import '../services/theme_controller.dart';
 import 'history_screen.dart';
 
 /// Settings screen for emergency triggers and app configuration
@@ -70,7 +71,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           children: [
             _themedTextField(controller, 'Pattern (e.g., 123==)'),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Enter a sequence that triggers an emergency alert when typed in the calculator.',
               style: TextStyle(fontSize: 12, color: AppTheme.grey),
             ),
@@ -201,7 +202,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           children: [
             _themedTextField(controller, 'e.g. help me now'),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Speak this phrase to trigger an SOS. Choose 2–4 clear words. '
               'Every word must be heard (order does not matter).',
               style: TextStyle(fontSize: 12, color: AppTheme.grey),
@@ -232,7 +233,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         title: 'Test Emergency System',
         saveLabel: 'Send Test',
         saveColor: AppTheme.warning,
-        content: const Text(
+        content: Text(
           'This will trigger a test emergency alert to all your trusted contacts. '
           'Are you sure you want to continue?',
           style: TextStyle(color: AppTheme.charcoalSoft),
@@ -261,6 +262,79 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  // ---- theme (dark / light / system) ----
+
+  String _themeLabel(ThemeMode mode) => switch (mode) {
+    ThemeMode.dark => 'Dark',
+    ThemeMode.light => 'Light',
+    ThemeMode.system => 'System default',
+  };
+
+  void _showThemeDialog() {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppTheme.card,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppTheme.radius),
+        ),
+        title: const Text(
+          'Theme',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _themeOption(
+              dialogContext,
+              ThemeMode.system,
+              'System default',
+              Icons.brightness_auto,
+            ),
+            _themeOption(
+              dialogContext,
+              ThemeMode.light,
+              'Light',
+              Icons.light_mode,
+            ),
+            _themeOption(
+              dialogContext,
+              ThemeMode.dark,
+              'Dark',
+              Icons.dark_mode,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _themeOption(
+    BuildContext dialogContext,
+    ThemeMode value,
+    String label,
+    IconData icon,
+  ) {
+    final selected = ThemeController.instance.mode.value == value;
+    return ListTile(
+      leading: Icon(icon, color: selected ? AppTheme.limeDark : AppTheme.grey),
+      title: Text(
+        label,
+        style: TextStyle(
+          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+          color: AppTheme.charcoal,
+        ),
+      ),
+      trailing: selected
+          ? const Icon(Icons.check_circle, color: AppTheme.limeDark)
+          : null,
+      onTap: () {
+        ThemeController.instance.setMode(value);
+        Navigator.pop(dialogContext);
+      },
+    );
+  }
+
   // ---- themed helpers ----
 
   Widget _themedDialog({
@@ -276,12 +350,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppTheme.radius),
       ),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+      title: Text(title, style: TextStyle(fontWeight: FontWeight.w700)),
       content: content,
       actions: [
         TextButton(
           onPressed: onCancel,
-          child: const Text('Cancel', style: TextStyle(color: AppTheme.grey)),
+          child: Text('Cancel', style: TextStyle(color: AppTheme.grey)),
         ),
         ElevatedButton(
           style: ElevatedButton.styleFrom(
@@ -404,6 +478,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onTap: _showAlertMessageDialog,
                 ),
                 const SizedBox(height: 24),
+                _buildSectionHeader('Appearance'),
+                ValueListenableBuilder<ThemeMode>(
+                  valueListenable: ThemeController.instance.mode,
+                  builder: (context, mode, _) => _buildTile(
+                    icon: switch (mode) {
+                      ThemeMode.dark => Icons.dark_mode,
+                      ThemeMode.light => Icons.light_mode,
+                      ThemeMode.system => Icons.brightness_auto,
+                    },
+                    title: 'Theme',
+                    subtitle: _themeLabel(mode),
+                    onTap: _showThemeDialog,
+                  ),
+                ),
+                const SizedBox(height: 24),
                 _buildSectionHeader('Testing & History'),
                 _buildTile(
                   icon: Icons.bug_report,
@@ -452,7 +541,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               borderRadius: BorderRadius.circular(16),
               boxShadow: AppTheme.limeShadow,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.health_and_safety,
               color: AppTheme.charcoal,
               size: 30,
@@ -495,7 +584,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       padding: const EdgeInsets.only(bottom: 12, left: 4),
       child: Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.w700,
           color: AppTheme.charcoal,
@@ -509,8 +598,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required String title,
     required String subtitle,
     required VoidCallback onTap,
-    Color accent = AppTheme.charcoal,
+    Color? accent,
   }) {
+    final accentColor = accent ?? AppTheme.charcoal;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
@@ -523,23 +613,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
         leading: Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: accent.withValues(alpha: 0.10),
+            color: accentColor.withValues(alpha: 0.10),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(icon, color: accent, size: 24),
+          child: Icon(icon, color: accentColor, size: 24),
         ),
         title: Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.w600,
             color: AppTheme.charcoal,
           ),
         ),
         subtitle: Text(
           subtitle,
-          style: const TextStyle(color: AppTheme.grey, fontSize: 12),
+          style: TextStyle(color: AppTheme.grey, fontSize: 12),
         ),
-        trailing: const Icon(Icons.chevron_right, color: AppTheme.grey),
+        trailing: Icon(Icons.chevron_right, color: AppTheme.grey),
         onTap: onTap,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppTheme.radius),
@@ -581,14 +671,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         title: Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.w600,
             color: AppTheme.charcoal,
           ),
         ),
         subtitle: Text(
           subtitle,
-          style: const TextStyle(color: AppTheme.grey, fontSize: 12),
+          style: TextStyle(color: AppTheme.grey, fontSize: 12),
         ),
         activeThumbColor: AppTheme.charcoal,
         activeTrackColor: AppTheme.lime,
@@ -609,9 +699,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            children: const [
+            children: [
               Icon(Icons.info_outline, color: AppTheme.limeDark),
-              SizedBox(width: 8),
+              const SizedBox(width: 8),
               Text(
                 'How It Works',
                 style: TextStyle(
@@ -623,7 +713,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             '• Calculator Pattern: Enter the secret sequence to trigger emergency\n'
             '• Shake Detection: Shake your phone the set number of times\n'
             '• Background Monitoring: Keep listening when app is minimized\n'
@@ -681,7 +771,7 @@ class _ShakeCountDialogState extends State<ShakeCountDialog> {
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(
+          Text(
             'Number of shakes required to trigger emergency:',
             style: TextStyle(color: AppTheme.charcoalSoft),
           ),
@@ -697,7 +787,7 @@ class _ShakeCountDialogState extends State<ShakeCountDialog> {
             ),
             child: Text(
               '$tempShakeCount',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.w800,
                 color: AppTheme.charcoal,
@@ -724,7 +814,7 @@ class _ShakeCountDialogState extends State<ShakeCountDialog> {
           ),
           Text(
             '$tempShakeCount shakes',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
               color: AppTheme.charcoal,
@@ -735,7 +825,7 @@ class _ShakeCountDialogState extends State<ShakeCountDialog> {
       actions: [
         TextButton(
           onPressed: widget.onCancel,
-          child: const Text('Cancel', style: TextStyle(color: AppTheme.grey)),
+          child: Text('Cancel', style: TextStyle(color: AppTheme.grey)),
         ),
         ElevatedButton(
           style: ElevatedButton.styleFrom(

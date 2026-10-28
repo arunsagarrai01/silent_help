@@ -51,8 +51,8 @@ class FirebaseService {
       if (kReleaseMode) {
         try {
           await FirebaseAppCheck.instance.activate(
-            androidProvider: AndroidProvider.playIntegrity,
-            appleProvider: AppleProvider.appAttest,
+            providerAndroid: const AndroidPlayIntegrityProvider(),
+            providerApple: const AppleAppAttestProvider(),
           );
         } catch (e) {
           debugPrint('App Check activate failed (continuing): $e');

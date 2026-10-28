@@ -48,7 +48,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         actions: [
           if (_records.isNotEmpty)
             IconButton(
-              icon: const Icon(Icons.delete_outline, color: AppTheme.danger),
+              icon: Icon(Icons.delete_outline, color: AppTheme.danger),
               tooltip: 'Clear history',
               onPressed: _confirmClear,
             ),
@@ -83,7 +83,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel', style: TextStyle(color: AppTheme.grey)),
+            child: Text('Cancel', style: TextStyle(color: AppTheme.grey)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -116,14 +116,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
               color: AppTheme.limeSoft,
               shape: BoxShape.circle,
             ),
-            child: const Icon(
-              Icons.history,
-              size: 64,
-              color: AppTheme.limeDark,
-            ),
+            child: Icon(Icons.history, size: 64, color: AppTheme.limeDark),
           ),
           const SizedBox(height: 20),
-          const Text(
+          Text(
             'No emergency alerts yet',
             style: TextStyle(
               fontSize: 18,
@@ -132,7 +128,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Alerts you send will appear here',
             style: TextStyle(fontSize: 14, color: AppTheme.grey),
           ),
@@ -168,7 +164,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         ),
         title: Text(
           r.triggerType,
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.w600,
             color: AppTheme.charcoal,
           ),
@@ -179,19 +175,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
             const SizedBox(height: 4),
             Text(
               _formatDate(r.timestamp),
-              style: const TextStyle(color: AppTheme.grey, fontSize: 12),
+              style: TextStyle(color: AppTheme.grey, fontSize: 12),
             ),
             Text(
               r.status,
-              style: const TextStyle(
-                color: AppTheme.charcoalSoft,
-                fontSize: 13,
-              ),
+              style: TextStyle(color: AppTheme.charcoalSoft, fontSize: 13),
             ),
             if (r.hasLocation)
               Text(
                 'Loc: ${r.latitude!.toStringAsFixed(4)}, ${r.longitude!.toStringAsFixed(4)}',
-                style: const TextStyle(fontSize: 12, color: AppTheme.grey),
+                style: TextStyle(fontSize: 12, color: AppTheme.grey),
               ),
           ],
         ),
